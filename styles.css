@@ -227,6 +227,8 @@ body {
 .card-table {
   grid-column: 1 / 3;
   grid-row: 2 / 3;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .card h2 {
@@ -438,6 +440,7 @@ textarea::placeholder {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 8px;
+  max-width: 100%;
 }
 
 .table-filters {
@@ -445,16 +448,19 @@ textarea::placeholder {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .table-filters input {
   width: 220px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .table-filters select {
   width: 145px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .filter-date-range {
@@ -473,6 +479,7 @@ textarea::placeholder {
 .filter-date-range input[type="date"] {
   width: 132px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .btn-filter-clear {
@@ -746,6 +753,55 @@ body.offline-banner-visible {
 
   .btn-filter-clear {
     width: 100%;
+  }
+}
+
+/* Móviles: filtros siempre en columna y sin salirse */
+@media (max-width: 600px) {
+  .layout {
+    padding-left: 12px;
+    padding-right: 12px;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .table-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .table-filters {
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .table-filters input,
+  .table-filters select {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .filter-date-range {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-date-range input[type="date"] {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .btn-filter-clear {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .card {
+    padding-left: 14px;
+    padding-right: 14px;
   }
 }
 

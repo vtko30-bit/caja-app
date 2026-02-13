@@ -328,6 +328,16 @@ async function handleSubmit(event) {
         return;
       }
       showToast("Movimiento agregado.");
+      state.movements = [...state.movements, { id: data.id, ...payload }];
+      renderTable();
+      resetForm();
+      loadMovementsFromSupabase().then((list) => {
+        if (Array.isArray(list)) {
+          state.movements = list;
+          renderTable();
+        }
+      }).catch(() => {});
+      return;
     }
     state.movements = await loadMovementsFromSupabase();
     renderTable();
