@@ -331,6 +331,11 @@ async function handleSubmit(event) {
       state.movements = [...state.movements, { id: data.id, ...payload }];
       renderTable();
       resetForm();
+      requestAnimationFrame(() => {
+        renderTable();
+        const tbody = document.getElementById("movements-body");
+        if (tbody && tbody.lastElementChild) tbody.lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
       loadMovementsFromSupabase().then((list) => {
         if (Array.isArray(list)) {
           state.movements = list;

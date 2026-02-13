@@ -1,17 +1,16 @@
-const CACHE_NAME = "caja-pwa-cache-v1";
+const CACHE_NAME = "caja-pwa-cache-v2";
 const OFFLINE_URLS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./config.js",
   "./manifest.json",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(OFFLINE_URLS);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(OFFLINE_URLS))
   );
   self.skipWaiting();
 });
@@ -29,21 +28,42 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+function isAppShell(url) {
+  const path = new URL(url).pathname;
+  return (
+    path === "/" ||
+    path.endsWith("/") ||
+    path.endsWith("index.html") ||
+    path.endsWith("app.js") ||
+    path.endsWith("config.js")
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request)
+  if (isAppShell(request.url)) {
+    event.respondWith(
+      fetch(request)
         .then((response) => {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           return response;
         })
-        .catch(() => cached);
-    })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        return response;
+      })
+      .catch(() => caches.match(request))
   );
 });
 
