@@ -24,12 +24,46 @@
             <label for="login-password">Contraseña</label>
             <input id="login-password" name="password" type="password" required placeholder="••••••••" autocomplete="current-password" />
           </div>
-          <p id="login-error" class="login-error hidden"></p>
+          <p id="login-message" class="login-message hidden"></p>
           <div class="login-actions">
-            <button type="submit" class="btn primary" id="btn-login-submit">Entrar</button>
-            <button type="button" class="btn ghost" id="btn-toggle-signup">Crear cuenta</button>
+            <button type="button" class="btn primary" id="btn-login-entrar">Entrar</button>
+            <button type="button" class="btn secondary" id="btn-login-crear">Crear cuenta</button>
           </div>
+          <p class="login-link-wrap">
+            <button type="button" class="btn-link" id="btn-olvide-password">¿Olvidaste tu contraseña?</button>
+          </p>
         </form>
+
+        <div id="login-recover-view" class="login-extra-view hidden">
+          <h3 class="login-extra-title">Recuperar contraseña</h3>
+          <p class="login-subtitle">Te enviaremos un enlace a tu correo para restablecerla.</p>
+          <div class="field">
+            <label for="recover-email">Correo</label>
+            <input id="recover-email" type="email" placeholder="tu@correo.com" autocomplete="email" />
+          </div>
+          <p id="recover-message" class="login-message hidden"></p>
+          <div class="login-actions">
+            <button type="button" class="btn primary" id="btn-enviar-enlace">Enviar enlace</button>
+            <button type="button" class="btn ghost" id="btn-volver-login">Volver a iniciar sesión</button>
+          </div>
+        </div>
+
+        <div id="login-new-password-view" class="login-extra-view hidden">
+          <h3 class="login-extra-title">Nueva contraseña</h3>
+          <p class="login-subtitle">Elige una contraseña de al menos 6 caracteres.</p>
+          <div class="field">
+            <label for="new-password">Contraseña</label>
+            <input id="new-password" type="password" placeholder="••••••••" autocomplete="new-password" />
+          </div>
+          <div class="field">
+            <label for="new-password-repeat">Repetir contraseña</label>
+            <input id="new-password-repeat" type="password" placeholder="••••••••" autocomplete="new-password" />
+          </div>
+          <p id="new-password-message" class="login-message hidden"></p>
+          <div class="login-actions">
+            <button type="button" class="btn primary" id="btn-guardar-password">Guardar contraseña</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -109,6 +143,7 @@
                 id="amount"
                 name="amount"
                 type="number"
+                inputmode="decimal"
                 step="0.01"
                 min="0"
                 required

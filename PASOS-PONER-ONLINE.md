@@ -100,6 +100,19 @@ Si quieres que solo quien tenga una cuenta pueda entrar:
 
 ---
 
+## Si el enlace de confirmación te abre otra web (otro proyecto en Vercel)
+
+La cuenta **sí queda confirmada** al hacer clic en el enlace (aunque te lleve a otro sitio). Para entrar: abre **la URL de tu app Caja** en Vercel y usa **Entrar** con tu correo y contraseña.
+
+Para que la próxima vez el enlace de confirmación lleve a la app Caja:
+
+1. En Supabase, menú **Authentication** → **URL Configuration**.
+2. En **Site URL** pon la URL de tu app Caja, por ejemplo: `https://tu-caja-app.vercel.app` (la que te da Vercel para este proyecto).
+3. En **Redirect URLs** añade la misma URL si no está, por ejemplo: `https://tu-caja-app.vercel.app`
+4. Guarda. Los próximos correos de confirmación redirigirán a tu app Caja.
+
+---
+
 ## Importante
 
 - La **anon key** es pública (va en el código del navegador). Eso es normal; la seguridad se controla en Supabase con las políticas (RLS).

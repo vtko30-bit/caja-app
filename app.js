@@ -24,7 +24,6 @@ let state = {
   useSupabase,
   deletedMovements: [],
   realtimeSubscription: null,
-  loginFormMode: "login", // "login" | "signup"
 };
 
 function rowToMovement(row) {
@@ -303,7 +302,8 @@ async function handleSubmit(event) {
   const date = (form.date?.value || "").trim();
   const concept = (form.concept?.value || "").trim();
   const type = form.type?.value || "ingreso";
-  const amount = parseFloat(String(form.amount?.value || "0").replace(",", ".")) || 0;
+  const amountRaw = String(form.amount?.value || "0").trim().replace(",", ".");
+  const amount = parseFloat(amountRaw) || 0;
   const local = (form.local?.value || "").trim();
   const notes = (form.notes?.value || "").trim();
   if (!date || !concept || !type || !amount) {
@@ -317,14 +317,14 @@ async function handleSubmit(event) {
     if (state.editingId) {
       const { error } = await supabase.from("movements").update(payload).eq("id", state.editingId);
       if (error) {
-        showToast("Error al actualizar.");
+        showToast("Error al actualizar: " + (error.message || "revisa la conexión."));
         return;
       }
       showToast("Movimiento actualizado.");
     } else {
       const { data, error } = await supabase.from("movements").insert(payload).select("id").single();
       if (error) {
-        showToast("Error al guardar.");
+        showToast("Error al guardar: " + (error.message || "revisa la conexión."));
         return;
       }
       showToast("Movimiento agregado.");
@@ -511,11 +511,16 @@ function showAppContent() {
   if (btnLogout) btnLogout.style.display = "";
 }
 
-function setLoginError(msg) {
-  const el = document.getElementById("login-error");
+function setLoginMessage(msg, isSuccess) {
+  const el = document.getElementById("login-message");
   if (!el) return;
   el.textContent = msg || "";
   el.classList.toggle("hidden", !msg);
+  el.classList.toggle("login-error", msg && !isSuccess);
+  el.classList.toggle("login-success", msg && isSuccess);
+}
+function setLoginError(msg) {
+  setLoginMessage(msg, false);
 }
 
 async function getSession() {
@@ -525,59 +530,211 @@ async function getSession() {
   return session;
 }
 
+function getLoginEmailPassword() {
+  const form = document.getElementById("login-form");
+  if (!form) return { email: "", password: "" };
+  const email = (form.email?.value || "").trim();
+  const password = form.password?.value || "";
+  return { email, password };
+}
+
+async function doLogin() {
+  const { email, password } = getLoginEmailPassword();
+  if (!email || !password) {
+    setLoginError("Completa correo y contraseña.");
+    return;
+  }
+  setLoginError("");
+  const supabase = getSupabase();
+  if (!supabase) {
+    setLoginError("Error de conexión. Recarga la página.");
+    return;
+  }
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    setLoginError("No hay cuenta con este correo o la contraseña es incorrecta. Si es la primera vez, usa «Crear cuenta».");
+    return;
+  }
+  showAppContent();
+  const btnEntrar = document.getElementById("btn-login-entrar");
+  const btnCrear = document.getElementById("btn-login-crear");
+  if (btnEntrar) btnEntrar.disabled = true;
+  if (btnCrear) btnCrear.disabled = true;
+  await initAppContent();
+  if (btnEntrar) btnEntrar.disabled = false;
+  if (btnCrear) btnCrear.disabled = false;
+  const btnLogout = document.getElementById("btn-logout");
+  if (btnLogout) btnLogout.style.display = "";
+}
+
+async function doSignUp() {
+  const { email, password } = getLoginEmailPassword();
+  if (!email || !password) {
+    setLoginError("Completa correo y contraseña.");
+    return;
+  }
+  if (password.length < 6) {
+    setLoginError("La contraseña debe tener al menos 6 caracteres.");
+    return;
+  }
+  setLoginError("");
+  const supabase = getSupabase();
+  if (!supabase) {
+    setLoginError("Error de conexión. Recarga la página.");
+    return;
+  }
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) {
+    const msg = (error.message || "").toLowerCase();
+    if (msg.includes("rate limit") || msg.includes("rate_limit") || msg.includes("exceeded")) {
+      setLoginError("Demasiados intentos. Espera 10–15 minutos antes de volver a intentar.");
+    } else {
+      setLoginError(error.message || "Error al crear la cuenta. ¿Ya tienes una? Prueba «Entrar».");
+    }
+    return;
+  }
+  if (data?.user && !data.session) {
+    setLoginMessage("Revisa tu correo para activar la cuenta (y la carpeta de spam). No vuelvas a pulsar «Crear cuenta».", true);
+    const btnCrear = document.getElementById("btn-login-crear");
+    if (btnCrear) {
+      btnCrear.disabled = true;
+      const textOrig = btnCrear.textContent;
+      btnCrear.textContent = "Revisa tu correo…";
+      setTimeout(() => {
+        btnCrear.disabled = false;
+        btnCrear.textContent = textOrig;
+      }, 60000);
+    }
+    return;
+  }
+  showAppContent();
+  const btnEntrar = document.getElementById("btn-login-entrar");
+  const btnCrear = document.getElementById("btn-login-crear");
+  if (btnEntrar) btnEntrar.disabled = true;
+  if (btnCrear) btnCrear.disabled = true;
+  await initAppContent();
+  if (btnEntrar) btnEntrar.disabled = false;
+  if (btnCrear) btnCrear.disabled = false;
+  const btnLogout = document.getElementById("btn-logout");
+  if (btnLogout) btnLogout.style.display = "";
+}
+
+function showLoginView(view) {
+  const form = document.getElementById("login-form");
+  const recoverView = document.getElementById("login-recover-view");
+  const newPasswordView = document.getElementById("login-new-password-view");
+  if (form) form.classList.toggle("hidden", view !== "login");
+  if (recoverView) recoverView.classList.toggle("hidden", view !== "recover");
+  if (newPasswordView) newPasswordView.classList.toggle("hidden", view !== "new-password");
+}
+
 function setupLoginListeners() {
   const form = document.getElementById("login-form");
-  const btnToggle = document.getElementById("btn-toggle-signup");
-  const submitBtn = document.getElementById("btn-login-submit");
+  const btnEntrar = document.getElementById("btn-login-entrar");
+  const btnCrear = document.getElementById("btn-login-crear");
+  const btnOlvide = document.getElementById("btn-olvide-password");
+  const btnVolver = document.getElementById("btn-volver-login");
+  const btnEnviarEnlace = document.getElementById("btn-enviar-enlace");
+  const btnGuardarPassword = document.getElementById("btn-guardar-password");
   if (!form) return;
 
-  form.addEventListener("submit", async (e) => {
+  form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const email = (form.email?.value || "").trim();
-    const password = form.password?.value || "";
-    if (!email || !password) {
-      setLoginError("Completa correo y contraseña.");
-      return;
-    }
-    setLoginError("");
-    const supabase = getSupabase();
-    if (!supabase) {
-      setLoginError("Error de conexión. Recarga la página.");
-      return;
-    }
-    if (state.loginFormMode === "signup") {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setLoginError(error.message || "Error al crear la cuenta.");
-        return;
-      }
-      if (data?.user && !data.session) {
-        setLoginError("Revisa tu correo para activar la cuenta.");
-        return;
-      }
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setLoginError("Correo o contraseña incorrectos.");
-        return;
-      }
-    }
-    showAppContent();
-    if (submitBtn) submitBtn.disabled = true;
-    await initAppContent();
-    if (submitBtn) submitBtn.disabled = false;
-    const btnLogout = document.getElementById("btn-logout");
-    if (btnLogout) btnLogout.style.display = "";
+    doLogin();
   });
 
-  if (btnToggle) {
-    btnToggle.addEventListener("click", () => {
-      state.loginFormMode = state.loginFormMode === "login" ? "signup" : "login";
-      if (submitBtn) submitBtn.textContent = state.loginFormMode === "signup" ? "Crear cuenta" : "Entrar";
-      if (btnToggle) btnToggle.textContent = state.loginFormMode === "signup" ? "Ya tengo cuenta" : "Crear cuenta";
-      setLoginError("");
-    });
+  if (btnEntrar) btnEntrar.addEventListener("click", (e) => { e.preventDefault(); doLogin(); });
+  if (btnCrear) btnCrear.addEventListener("click", (e) => { e.preventDefault(); doSignUp(); });
+
+  if (btnOlvide) btnOlvide.addEventListener("click", () => {
+    setLoginMessage("", false);
+    showLoginView("recover");
+    const emailEl = document.getElementById("recover-email");
+    if (emailEl) { emailEl.value = document.getElementById("login-email")?.value || ""; emailEl.focus(); }
+  });
+  if (btnVolver) btnVolver.addEventListener("click", () => {
+    const recoverMsg = document.getElementById("recover-message");
+    if (recoverMsg) recoverMsg.classList.add("hidden");
+    showLoginView("login");
+  });
+  if (btnEnviarEnlace) btnEnviarEnlace.addEventListener("click", doForgotPassword);
+  if (btnGuardarPassword) btnGuardarPassword.addEventListener("click", doUpdatePassword);
+}
+
+function setRecoverMessage(msg, isSuccess) {
+  const el = document.getElementById("recover-message");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("hidden", !msg);
+  el.classList.toggle("login-error", msg && !isSuccess);
+  el.classList.toggle("login-success", msg && isSuccess);
+}
+function setNewPasswordMessage(msg, isSuccess) {
+  const el = document.getElementById("new-password-message");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("hidden", !msg);
+  el.classList.toggle("login-error", msg && !isSuccess);
+  el.classList.toggle("login-success", msg && isSuccess);
+}
+
+async function doForgotPassword() {
+  const emailEl = document.getElementById("recover-email");
+  const email = (emailEl?.value || "").trim();
+  if (!email) {
+    setRecoverMessage("Escribe tu correo.", false);
+    return;
   }
+  setRecoverMessage("");
+  const supabase = getSupabase();
+  if (!supabase) {
+    setRecoverMessage("Error de conexión. Recarga la página.", false);
+    return;
+  }
+  const redirectTo = window.location.origin + window.location.pathname + window.location.search;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) {
+    const msg = (error.message || "").toLowerCase();
+    if (msg.includes("rate limit") || msg.includes("exceeded")) {
+      setRecoverMessage("Demasiados intentos. Espera 10–15 minutos antes de volver a enviar el enlace. Si tienes acceso a Supabase, puedes restablecer la contraseña desde Authentication → Users.", false);
+    } else {
+      setRecoverMessage(error.message || "No se pudo enviar el enlace.", false);
+    }
+    return;
+  }
+  setRecoverMessage("Revisa tu correo (y la carpeta de spam) para restablecer la contraseña.", true);
+}
+
+async function doUpdatePassword() {
+  const newPass = document.getElementById("new-password")?.value || "";
+  const repeat = document.getElementById("new-password-repeat")?.value || "";
+  if (newPass.length < 6) {
+    setNewPasswordMessage("La contraseña debe tener al menos 6 caracteres.", false);
+    return;
+  }
+  if (newPass !== repeat) {
+    setNewPasswordMessage("Las contraseñas no coinciden.", false);
+    return;
+  }
+  setNewPasswordMessage("");
+  const supabase = getSupabase();
+  if (!supabase) {
+    setNewPasswordMessage("Error de conexión.", false);
+    return;
+  }
+  const { error } = await supabase.auth.updateUser({ password: newPass });
+  if (error) {
+    setNewPasswordMessage(error.message || "No se pudo guardar.", false);
+    return;
+  }
+  setNewPasswordMessage("Contraseña actualizada. Entrando…", true);
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  showAppContent();
+  const btnGuardar = document.getElementById("btn-guardar-password");
+  if (btnGuardar) btnGuardar.disabled = true;
+  await initAppContent();
+  if (btnGuardar) btnGuardar.disabled = false;
+  document.getElementById("btn-logout")?.style.setProperty("display", "");
 }
 
 async function initAppContent() {
@@ -672,6 +829,11 @@ async function init() {
       if (!session) {
         showLoginScreen();
         setupLoginListeners();
+        if (window.location.hash && window.location.hash.includes("type=recovery")) {
+          showLoginView("new-password");
+        } else {
+          showLoginView("login");
+        }
         return;
       }
       showAppContent();

@@ -124,11 +124,17 @@ body {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent-strong);
 }
-.login-error {
-  color: var(--danger);
-  font-size: 0.85rem;
+.login-message {
+  font-size: 0.9rem;
   margin: 8px 0 4px;
   min-height: 1.2em;
+}
+.login-message.login-error {
+  color: var(--danger);
+}
+.login-message.login-success {
+  color: var(--positive);
+  font-weight: 500;
 }
 .login-actions {
   display: flex;
@@ -137,6 +143,38 @@ body {
   margin-top: 16px;
 }
 .login-actions .btn { width: 100%; }
+
+.login-link-wrap {
+  margin: 14px 0 0;
+  text-align: center;
+}
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+  text-decoration: underline;
+}
+.btn-link:hover { color: #5eead4; }
+
+.login-extra-view { margin-top: 0; }
+.login-extra-view .field { margin-bottom: 4px; }
+.login-extra-view input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text);
+  font-size: 1rem;
+  width: 100%;
+}
+.login-extra-title {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
 
 .topbar-right {
   display: flex;
@@ -406,20 +444,24 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .table-filters input {
   width: 220px;
+  min-width: 0;
 }
 
 .table-filters select {
   width: 145px;
+  min-width: 0;
 }
 
 .filter-date-range {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .filter-date-label {
@@ -430,6 +472,7 @@ textarea::placeholder {
 
 .filter-date-range input[type="date"] {
   width: 132px;
+  min-width: 0;
 }
 
 .btn-filter-clear {
@@ -668,11 +711,40 @@ body.offline-banner-visible {
     gap: 10px;
   }
 
+  .topbar-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .table-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
   .table-filters {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .table-filters input,
+  .table-filters select {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .filter-date-range {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .filter-date-range input[type="date"] {
     width: 100%;
   }
 
-  .table-filters input {
+  .btn-filter-clear {
     width: 100%;
   }
 }
