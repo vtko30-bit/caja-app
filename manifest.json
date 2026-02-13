@@ -1,0 +1,10 @@
+{
+  "name": "Caja - Movimientos",
+  "short_name": "Caja",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#0f766e",
+  "icons": []
+}
+
