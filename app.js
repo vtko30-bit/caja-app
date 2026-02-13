@@ -24,6 +24,7 @@ let state = {
   useSupabase,
   deletedMovements: [],
   realtimeSubscription: null,
+  loginFormMode: "login", // "login" | "signup"
 };
 
 function rowToMovement(row) {
@@ -493,6 +494,104 @@ async function openDeletedPanel() {
   showDeletedPanel();
 }
 
+// --- Login / Auth (solo cuando useSupabase) ---
+function showLoginScreen() {
+  const login = document.getElementById("login-screen");
+  const app = document.getElementById("app-content");
+  if (login) login.classList.remove("hidden");
+  if (app) app.classList.add("hidden");
+}
+
+function showAppContent() {
+  const login = document.getElementById("login-screen");
+  const app = document.getElementById("app-content");
+  if (login) login.classList.add("hidden");
+  if (app) app.classList.remove("hidden");
+  const btnLogout = document.getElementById("btn-logout");
+  if (btnLogout) btnLogout.style.display = "";
+}
+
+function setLoginError(msg) {
+  const el = document.getElementById("login-error");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("hidden", !msg);
+}
+
+async function getSession() {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data: { session } } = await supabase.auth.getSession();
+  return session;
+}
+
+function setupLoginListeners() {
+  const form = document.getElementById("login-form");
+  const btnToggle = document.getElementById("btn-toggle-signup");
+  const submitBtn = document.getElementById("btn-login-submit");
+  if (!form) return;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = (form.email?.value || "").trim();
+    const password = form.password?.value || "";
+    if (!email || !password) {
+      setLoginError("Completa correo y contraseña.");
+      return;
+    }
+    setLoginError("");
+    const supabase = getSupabase();
+    if (!supabase) {
+      setLoginError("Error de conexión. Recarga la página.");
+      return;
+    }
+    if (state.loginFormMode === "signup") {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setLoginError(error.message || "Error al crear la cuenta.");
+        return;
+      }
+      if (data?.user && !data.session) {
+        setLoginError("Revisa tu correo para activar la cuenta.");
+        return;
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setLoginError("Correo o contraseña incorrectos.");
+        return;
+      }
+    }
+    showAppContent();
+    if (submitBtn) submitBtn.disabled = true;
+    await initAppContent();
+    if (submitBtn) submitBtn.disabled = false;
+    const btnLogout = document.getElementById("btn-logout");
+    if (btnLogout) btnLogout.style.display = "";
+  });
+
+  if (btnToggle) {
+    btnToggle.addEventListener("click", () => {
+      state.loginFormMode = state.loginFormMode === "login" ? "signup" : "login";
+      if (submitBtn) submitBtn.textContent = state.loginFormMode === "signup" ? "Crear cuenta" : "Entrar";
+      if (btnToggle) btnToggle.textContent = state.loginFormMode === "signup" ? "Ya tengo cuenta" : "Crear cuenta";
+      setLoginError("");
+    });
+  }
+}
+
+async function initAppContent() {
+  const dateInput = document.getElementById("date");
+  if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+  const btnVerEliminados = document.getElementById("btn-ver-eliminados");
+  if (btnVerEliminados) btnVerEliminados.style.display = state.useSupabase ? "" : "none";
+  setupEventListeners();
+  setupOfflineDetection();
+  state.movements = await loadMovements();
+  renderTable();
+  setupRealtime();
+}
+
 function setupEventListeners() {
   const form = document.getElementById("movement-form");
   if (form) form.addEventListener("submit", handleSubmit);
@@ -533,6 +632,13 @@ function setupEventListeners() {
   if (btnVerEliminados) btnVerEliminados.addEventListener("click", openDeletedPanel);
   const btnVolver = document.getElementById("btn-volver-movimientos");
   if (btnVolver) btnVolver.addEventListener("click", hideDeletedPanel);
+
+  const btnLogout = document.getElementById("btn-logout");
+  if (btnLogout) btnLogout.addEventListener("click", async () => {
+    const supabase = getSupabase();
+    if (supabase) await supabase.auth.signOut();
+    showLoginScreen();
+  });
 }
 
 function setupRealtime() {
@@ -561,17 +667,17 @@ function setupOfflineDetection() {
 
 async function init() {
   try {
-    const dateInput = document.getElementById("date");
-    if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+    if (state.useSupabase && getSupabase()) {
+      const session = await getSession();
+      if (!session) {
+        showLoginScreen();
+        setupLoginListeners();
+        return;
+      }
+      showAppContent();
+    }
 
-    const btnVerEliminados = document.getElementById("btn-ver-eliminados");
-    if (btnVerEliminados) btnVerEliminados.style.display = state.useSupabase ? "" : "none";
-
-    setupEventListeners();
-    setupOfflineDetection();
-    state.movements = await loadMovements();
-    renderTable();
-    setupRealtime();
+    await initAppContent();
   } catch (e) {
     console.error("Error al iniciar la app:", e);
     if (typeof alert !== "undefined") alert("Error al cargar la app. Abre la consola (F12) para más detalles.");

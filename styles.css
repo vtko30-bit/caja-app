@@ -79,6 +79,65 @@ body {
   background: radial-gradient(circle at top, #0f172a, #022c22);
 }
 
+/* Pantalla de login (modo Online) */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: radial-gradient(circle at top, #0b1120 0, #020617 60%, #000 100%);
+}
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  padding: 28px 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.95));
+  box-shadow: var(--shadow-soft);
+}
+.login-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.4rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.login-subtitle {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.login-card .field {
+  margin-bottom: 4px;
+}
+.login-card input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text);
+  font-size: 1rem;
+}
+.login-card input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-strong);
+}
+.login-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 8px 0 4px;
+  min-height: 1.2em;
+}
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+.login-actions .btn { width: 100%; }
+
 .topbar-right {
   display: flex;
   align-items: center;

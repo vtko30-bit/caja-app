@@ -10,22 +10,47 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div id="offline-banner" class="offline-banner hidden">Sin conexión. Los cambios se guardarán al reconectar.</div>
+    <!-- Pantalla de login (solo cuando la app está en modo Online con Supabase) -->
+    <div id="login-screen" class="login-screen hidden">
+      <div class="login-card">
+        <h2>Caja</h2>
+        <p class="login-subtitle">Inicia sesión para continuar</p>
+        <form id="login-form">
+          <div class="field">
+            <label for="login-email">Correo</label>
+            <input id="login-email" name="email" type="email" required placeholder="tu@correo.com" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label for="login-password">Contraseña</label>
+            <input id="login-password" name="password" type="password" required placeholder="••••••••" autocomplete="current-password" />
+          </div>
+          <p id="login-error" class="login-error hidden"></p>
+          <div class="login-actions">
+            <button type="submit" class="btn primary" id="btn-login-submit">Entrar</button>
+            <button type="button" class="btn ghost" id="btn-toggle-signup">Crear cuenta</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
-    <header class="topbar">
-      <div class="topbar-left">
-        <h1>Caja</h1>
-        <span id="badge-mode" class="badge">Local</span>
-      </div>
-      <div class="topbar-right">
-        <button type="button" class="btn secondary" id="btn-ver-eliminados" style="display: none;">Ver eliminados</button>
-        <button id="btn-export" class="btn secondary">Exportar JSON</button>
-        <label class="btn secondary file-btn">
-          Importar JSON
-          <input id="file-import" type="file" accept="application/json" hidden />
-        </label>
-      </div>
-    </header>
+    <div id="app-content" class="app-content">
+      <div id="offline-banner" class="offline-banner hidden">Sin conexión. Los cambios se guardarán al reconectar.</div>
+
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1>Caja</h1>
+          <span id="badge-mode" class="badge">Local</span>
+        </div>
+        <div class="topbar-right">
+          <button type="button" class="btn secondary" id="btn-logout" style="display: none;">Cerrar sesión</button>
+          <button type="button" class="btn secondary" id="btn-ver-eliminados" style="display: none;">Ver eliminados</button>
+          <button id="btn-export" class="btn secondary">Exportar JSON</button>
+          <label class="btn secondary file-btn">
+            Importar JSON
+            <input id="file-import" type="file" accept="application/json" hidden />
+          </label>
+        </div>
+      </header>
 
     <main class="layout">
       <section class="card card-form">
@@ -194,15 +219,16 @@
       </div>
     </section>
 
-    <div id="toast" class="toast hidden"></div>
+      <div id="toast" class="toast hidden"></div>
+    </div>
 
     <script>
       window.CAJA_SUPABASE_URL = window.CAJA_SUPABASE_URL || "";
       window.CAJA_SUPABASE_ANON_KEY = window.CAJA_SUPABASE_ANON_KEY || "";
     </script>
     <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
     <script src="app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous" async></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
