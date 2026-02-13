@@ -4,13 +4,18 @@ const STORAGE_KEY = "caja_movimientos_v1";
 const supabaseUrl = (typeof window !== "undefined" && window.CAJA_SUPABASE_URL) || "";
 const supabaseAnonKey = (typeof window !== "undefined" && window.CAJA_SUPABASE_ANON_KEY) || "";
 const useSupabase = !!(supabaseUrl && supabaseAnonKey);
-let supabase = null;
-try {
-  if (useSupabase && typeof window !== "undefined" && window.supabase && window.supabase.createClient) {
-    supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+let supabaseClient = null;
+function getSupabase() {
+  if (!useSupabase || !supabaseUrl || !supabaseAnonKey) return null;
+  if (supabaseClient) return supabaseClient;
+  try {
+    if (typeof window !== "undefined" && window.supabase && window.supabase.createClient) {
+      supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+    }
+  } catch (e) {
+    console.warn("Supabase no disponible:", e);
   }
-} catch (e) {
-  console.warn("Supabase no disponible, modo local:", e);
+  return supabaseClient;
 }
 
 let state = {
@@ -37,6 +42,7 @@ function rowToMovement(row) {
 }
 
 async function loadMovementsFromSupabase() {
+  const supabase = getSupabase();
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("movements")
@@ -270,6 +276,7 @@ function deleteMovement(id) {
   if (!confirm("¿Eliminar este movimiento? Quedará en el registro de eliminados.")) return;
   // Diferir el trabajo pesado para no bloquear INP (respuesta al clic)
   setTimeout(async () => {
+    const supabase = getSupabase();
     if (state.useSupabase && supabase && navigator.onLine) {
       const { error } = await supabase.from("movements").update({ deleted_at: new Date().toISOString() }).eq("id", id);
       if (error) {
@@ -304,6 +311,7 @@ async function handleSubmit(event) {
   }
   const payload = { date, local, concept, type, amount, notes };
 
+  const supabase = getSupabase();
   if (state.useSupabase && supabase && navigator.onLine) {
     if (state.editingId) {
       const { error } = await supabase.from("movements").update(payload).eq("id", state.editingId);
@@ -379,10 +387,11 @@ async function importJSONFromFile(file) {
         local: item.local || "",
         notes: item.notes || "",
       }));
-    if (state.useSupabase && supabase && navigator.onLine) {
+    const supabaseImport = getSupabase();
+    if (state.useSupabase && supabaseImport && navigator.onLine) {
       for (const row of cleaned) {
         const { date, local, concept, type, amount, notes } = row;
-        await supabase.from("movements").insert({ date, local, concept, type, amount, notes });
+        await supabaseImport.from("movements").insert({ date, local, concept, type, amount, notes });
       }
       state.movements = await loadMovementsFromSupabase();
       showToast("Datos importados.");
@@ -399,6 +408,7 @@ async function importJSONFromFile(file) {
 }
 
 async function loadDeletedMovements() {
+  const supabase = getSupabase();
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("movements")
@@ -445,6 +455,7 @@ function renderDeletedPanel(list) {
 }
 
 async function restoreMovement(id) {
+  const supabase = getSupabase();
   if (!supabase) return;
   const { error } = await supabase.from("movements").update({ deleted_at: null }).eq("id", id);
   if (error) {
@@ -473,7 +484,7 @@ function hideDeletedPanel() {
 }
 
 async function openDeletedPanel() {
-  if (state.useSupabase && supabase) {
+  if (state.useSupabase && getSupabase()) {
     state.deletedMovements = await loadDeletedMovements();
     renderDeletedPanel(state.deletedMovements);
   } else {
@@ -525,6 +536,7 @@ function setupEventListeners() {
 }
 
 function setupRealtime() {
+  const supabase = getSupabase();
   if (!state.useSupabase || !supabase) return;
   state.realtimeSubscription = supabase
     .channel("movements-changes")
