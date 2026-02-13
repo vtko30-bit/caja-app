@@ -266,24 +266,27 @@ function startEdit(id) {
   if (submitBtn) submitBtn.textContent = "Actualizar";
 }
 
-async function deleteMovement(id) {
+function deleteMovement(id) {
   if (!confirm("¿Eliminar este movimiento? Quedará en el registro de eliminados.")) return;
-  if (state.useSupabase && supabase && navigator.onLine) {
-    const { error } = await supabase.from("movements").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-    if (error) {
-      showToast("Error al eliminar.");
+  // Diferir el trabajo pesado para no bloquear INP (respuesta al clic)
+  setTimeout(async () => {
+    if (state.useSupabase && supabase && navigator.onLine) {
+      const { error } = await supabase.from("movements").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+      if (error) {
+        showToast("Error al eliminar.");
+        return;
+      }
+      state.movements = state.movements.filter((m) => m.id !== id);
+      saveMovementsLocal(state.movements);
+      renderTable();
+      showToast("Movimiento eliminado.");
       return;
     }
     state.movements = state.movements.filter((m) => m.id !== id);
     saveMovementsLocal(state.movements);
     renderTable();
     showToast("Movimiento eliminado.");
-    return;
-  }
-  state.movements = state.movements.filter((m) => m.id !== id);
-  saveMovementsLocal(state.movements);
-  renderTable();
-  showToast("Movimiento eliminado.");
+  }, 0);
 }
 
 async function handleSubmit(event) {
