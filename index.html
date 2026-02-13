@@ -196,7 +196,11 @@
 
     <div id="toast" class="toast hidden"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      window.CAJA_SUPABASE_URL = window.CAJA_SUPABASE_URL || "";
+      window.CAJA_SUPABASE_ANON_KEY = window.CAJA_SUPABASE_ANON_KEY || "";
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
     <script src="config.js"></script>
     <script src="app.js"></script>
     <script>

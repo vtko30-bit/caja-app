@@ -5,8 +5,12 @@ const supabaseUrl = (typeof window !== "undefined" && window.CAJA_SUPABASE_URL) 
 const supabaseAnonKey = (typeof window !== "undefined" && window.CAJA_SUPABASE_ANON_KEY) || "";
 const useSupabase = !!(supabaseUrl && supabaseAnonKey);
 let supabase = null;
-if (useSupabase && typeof window !== "undefined" && window.supabase) {
-  supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+try {
+  if (useSupabase && typeof window !== "undefined" && window.supabase && window.supabase.createClient) {
+    supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+  }
+} catch (e) {
+  console.warn("Supabase no disponible, modo local:", e);
 }
 
 let state = {
@@ -541,17 +545,26 @@ function setupOfflineDetection() {
 }
 
 async function init() {
-  const dateInput = document.getElementById("date");
-  if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+  try {
+    const dateInput = document.getElementById("date");
+    if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
 
-  const btnVerEliminados = document.getElementById("btn-ver-eliminados");
-  if (btnVerEliminados) btnVerEliminados.style.display = state.useSupabase ? "" : "none";
+    const btnVerEliminados = document.getElementById("btn-ver-eliminados");
+    if (btnVerEliminados) btnVerEliminados.style.display = state.useSupabase ? "" : "none";
 
-  setupEventListeners();
-  setupOfflineDetection();
-  state.movements = await loadMovements();
-  renderTable();
-  setupRealtime();
+    setupEventListeners();
+    setupOfflineDetection();
+    state.movements = await loadMovements();
+    renderTable();
+    setupRealtime();
+  } catch (e) {
+    console.error("Error al iniciar la app:", e);
+    if (typeof alert !== "undefined") alert("Error al cargar la app. Abre la consola (F12) para más detalles.");
+  }
 }
 
-document.addEventListener("DOMContentLoaded", init);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
