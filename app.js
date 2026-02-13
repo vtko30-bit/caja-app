@@ -524,6 +524,7 @@ function showAppContent() {
   if (app) app.classList.remove("hidden");
   const btnLogout = document.getElementById("btn-logout");
   if (btnLogout) btnLogout.style.display = "";
+  if (typeof syncMenuVisibility === "function") syncMenuVisibility();
 }
 
 function setLoginMessage(msg, isSuccess) {
@@ -752,11 +753,21 @@ async function doUpdatePassword() {
   document.getElementById("btn-logout")?.style.setProperty("display", "");
 }
 
+function syncMenuVisibility() {
+  const btnVer = document.getElementById("btn-ver-eliminados");
+  const btnLogout = document.getElementById("btn-logout");
+  const menuVer = document.getElementById("menu-ver-eliminados");
+  const menuLogout = document.getElementById("menu-logout");
+  if (menuVer) menuVer.style.display = btnVer && btnVer.style.display !== "none" ? "" : "none";
+  if (menuLogout) menuLogout.style.display = btnLogout && btnLogout.style.display !== "none" ? "" : "none";
+}
+
 async function initAppContent() {
   const dateInput = document.getElementById("date");
   if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
   const btnVerEliminados = document.getElementById("btn-ver-eliminados");
   if (btnVerEliminados) btnVerEliminados.style.display = state.useSupabase ? "" : "none";
+  syncMenuVisibility();
   setupEventListeners();
   setupOfflineDetection();
   state.movements = await loadMovements();
@@ -811,6 +822,47 @@ function setupEventListeners() {
     if (supabase) await supabase.auth.signOut();
     showLoginScreen();
   });
+
+  const btnMenu = document.getElementById("btn-topbar-menu");
+  const menuDropdown = document.getElementById("topbar-menu-dropdown");
+  function closeMenu() {
+    if (menuDropdown) menuDropdown.classList.add("hidden");
+  }
+  if (btnMenu && menuDropdown) {
+    btnMenu.addEventListener("click", (e) => {
+      e.stopPropagation();
+      menuDropdown.classList.toggle("hidden");
+    });
+    document.body.addEventListener("click", () => closeMenu());
+    menuDropdown.addEventListener("click", (e) => e.stopPropagation());
+  }
+  const menuVer = document.getElementById("menu-ver-eliminados");
+  if (menuVer) menuVer.addEventListener("click", () => { openDeletedPanel(); closeMenu(); });
+  const menuExport = document.getElementById("menu-export");
+  if (menuExport) menuExport.addEventListener("click", () => { exportJSON(); closeMenu(); });
+  const fileImportMenu = document.getElementById("file-import-menu");
+  if (fileImportMenu) fileImportMenu.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (file) { importJSONFromFile(file); e.target.value = ""; closeMenu(); }
+  });
+  const menuLogout = document.getElementById("menu-logout");
+  if (menuLogout) menuLogout.addEventListener("click", async () => {
+    closeMenu();
+    const supabase = getSupabase();
+    if (supabase) await supabase.auth.signOut();
+    showLoginScreen();
+  });
+
+  const btnFiltersToggle = document.getElementById("btn-filters-toggle");
+  const filtersDetail = document.getElementById("filters-detail");
+  const filtersToggleIcon = document.querySelector(".filters-toggle-icon");
+  if (btnFiltersToggle && filtersDetail) {
+    btnFiltersToggle.addEventListener("click", () => {
+      const open = filtersDetail.classList.toggle("filters-open");
+      btnFiltersToggle.setAttribute("aria-expanded", open);
+      if (filtersToggleIcon) filtersToggleIcon.classList.toggle("open", open);
+    });
+  }
 }
 
 function setupRealtime() {

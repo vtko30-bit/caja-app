@@ -76,13 +76,26 @@
           <span id="badge-mode" class="badge">Local</span>
         </div>
         <div class="topbar-right">
-          <button type="button" class="btn secondary" id="btn-logout" style="display: none;">Cerrar sesión</button>
-          <button type="button" class="btn secondary" id="btn-ver-eliminados" style="display: none;">Ver eliminados</button>
-          <button id="btn-export" class="btn secondary">Exportar JSON</button>
-          <label class="btn secondary file-btn">
-            Importar JSON
-            <input id="file-import" type="file" accept="application/json" hidden />
-          </label>
+          <div class="topbar-actions">
+            <button type="button" class="btn secondary" id="btn-logout" style="display: none;">Cerrar sesión</button>
+            <button type="button" class="btn secondary" id="btn-ver-eliminados" style="display: none;">Ver eliminados</button>
+            <button id="btn-export" class="btn secondary">Exportar JSON</button>
+            <label class="btn secondary file-btn">
+              Importar JSON
+              <input id="file-import" type="file" accept="application/json" hidden />
+            </label>
+          </div>
+          <div class="topbar-menu-wrap">
+            <button type="button" class="btn btn-icon topbar-menu-btn" id="btn-topbar-menu" title="Menú" aria-label="Menú">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg>
+            </button>
+            <div id="topbar-menu-dropdown" class="topbar-menu-dropdown hidden">
+              <button type="button" class="menu-item" id="menu-ver-eliminados" style="display: none;">Ver eliminados</button>
+              <button type="button" class="menu-item" id="menu-export">Exportar JSON</button>
+              <label class="menu-item file-btn-label"><span>Importar JSON</span><input id="file-import-menu" type="file" accept="application/json" hidden /></label>
+              <button type="button" class="menu-item menu-item-logout" id="menu-logout" style="display: none;">Cerrar sesión</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -190,25 +203,34 @@
         <div class="table-header">
           <h2>Movimientos</h2>
           <div class="table-filters">
-            <input
-              id="filter-text"
-              type="text"
-              placeholder="Filtrar por concepto o local..."
-            />
-            <select id="filter-type">
-              <option value="todos">Todos</option>
-              <option value="ingreso">Solo ingresos</option>
-              <option value="egreso">Solo egresos</option>
-            </select>
-            <span class="filter-date-range">
-              <label for="filter-date-desde" class="filter-date-label">Desde</label>
-              <input id="filter-date-desde" type="date" title="Fecha desde" />
-              <label for="filter-date-hasta" class="filter-date-label">Hasta</label>
-              <input id="filter-date-hasta" type="date" title="Fecha hasta" />
-              <button type="button" class="btn btn-filter-clear" id="btn-clear-date-filter" title="Quitar filtro de fechas para ver todos los movimientos">
-                Quitar fechas
+            <div class="filters-toggle-row">
+              <input
+                id="filter-text"
+                type="text"
+                placeholder="Filtrar por concepto o local..."
+                class="filter-text-input"
+              />
+              <button type="button" class="btn btn-filters-toggle" id="btn-filters-toggle" aria-expanded="false">
+                <span class="filters-toggle-label">Filtros</span>
+                <svg class="filters-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
-            </span>
+            </div>
+            <div class="table-filters-detail" id="filters-detail">
+              <select id="filter-type">
+                <option value="todos">Todos</option>
+                <option value="ingreso">Solo ingresos</option>
+                <option value="egreso">Solo egresos</option>
+              </select>
+              <span class="filter-date-range">
+                <label for="filter-date-desde" class="filter-date-label">Desde</label>
+                <input id="filter-date-desde" type="date" title="Fecha desde" />
+                <label for="filter-date-hasta" class="filter-date-label">Hasta</label>
+                <input id="filter-date-hasta" type="date" title="Fecha hasta" />
+                <button type="button" class="btn btn-filter-clear" id="btn-clear-date-filter" title="Quitar filtro de fechas">
+                  Quitar fechas
+                </button>
+              </span>
+            </div>
           </div>
         </div>
         <div class="table-wrapper">
