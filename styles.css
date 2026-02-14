@@ -45,7 +45,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 22px;
+  padding: 8px 18px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.3);
   backdrop-filter: blur(18px);
   background: linear-gradient(
@@ -59,11 +59,11 @@ body {
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .topbar h1 {
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   margin: 0;
@@ -71,8 +71,8 @@ body {
 }
 
 .badge {
-  font-size: 0.72rem;
-  padding: 4px 10px;
+  font-size: 0.68rem;
+  padding: 3px 8px;
   border-radius: var(--radius-pill);
   border: 1px solid rgba(45, 212, 191, 0.5);
   color: #5eead4;
@@ -188,13 +188,13 @@ body {
 }
 
 .btn-icon {
-  padding: 8px;
-  min-width: 40px;
-  min-height: 40px;
+  padding: 6px;
+  min-width: 36px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--border-subtle);
   background: transparent;
   color: var(--text);
@@ -824,7 +824,7 @@ body.offline-banner-visible {
   .topbar {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 6px;
   }
 
   .topbar-right {
