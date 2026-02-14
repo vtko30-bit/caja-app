@@ -414,6 +414,10 @@ form {
   gap: 10px;
 }
 
+.field-date-local {
+  grid-template-columns: 1fr 1fr;
+}
+
 label {
   font-size: 0.8rem;
   color: var(--muted);
@@ -868,6 +872,10 @@ body.offline-banner-visible {
     padding-right: 12px;
     max-width: 100vw;
     overflow-x: hidden;
+  }
+
+  .field-date-local {
+    grid-template-columns: 1fr;
   }
 
   .table-header {
