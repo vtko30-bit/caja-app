@@ -527,7 +527,7 @@ textarea::placeholder {
 .summary-value {
   display: block;
   margin-top: 3px;
-  font-size: 0.95rem;
+  font-size: 1.2rem;
   font-weight: 600;
 }
 
