@@ -303,12 +303,20 @@ async function handleSubmit(event) {
   const date = (form.date?.value || "").trim();
   const concept = (form.concept?.value || "").trim();
   const type = form.type?.value || "ingreso";
-  const amountRaw = String(form.amount?.value || "0").trim().replace(",", ".");
-  const amount = parseFloat(amountRaw) || 0;
+  const amountStr = String(form.amount?.value ?? "").trim().replace(",", ".");
+  const amount = parseFloat(amountStr);
   const local = (form.local?.value || "").trim();
   const notes = (form.notes?.value || "").trim();
-  if (!date || !concept || !type || !amount) {
-    alert("Completa fecha, concepto, tipo y monto.");
+  if (!date || !concept || !type) {
+    alert("Completa fecha, concepto y tipo.");
+    return;
+  }
+  if (form.amount?.value === "" || form.amount?.value == null) {
+    alert("Completa el monto.");
+    return;
+  }
+  if (isNaN(amount) || amount < 0) {
+    alert("El monto debe ser un número mayor o igual a 0.");
     return;
   }
   const payload = { date, local, concept, type, amount, notes };
