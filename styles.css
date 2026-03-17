@@ -649,6 +649,29 @@ td {
   border-bottom: 1px solid rgba(30, 64, 175, 0.35);
 }
 
+.sort-header {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sort-header .sort-arrow {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.sort-header.sorted .sort-arrow {
+  opacity: 1;
+}
+
 th {
   text-align: left;
   font-weight: 500;

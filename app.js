@@ -24,6 +24,8 @@ let state = {
   useSupabase,
   deletedMovements: [],
   realtimeSubscription: null,
+  sortBy: "date",
+  sortDir: "asc",
 };
 
 function rowToMovement(row) {
@@ -199,8 +201,29 @@ function renderTable() {
   tbody.innerHTML = "";
   const filtered = applyFilters(state.movements);
   const sorted = filtered.slice().sort((a, b) => {
-    if ((a.date || "") !== (b.date || "")) return (a.date || "").localeCompare(b.date || "");
-    return String(a.id).localeCompare(String(b.id));
+    const col = state.sortBy || "date";
+    const dir = state.sortDir === "desc" ? -1 : 1;
+    let res = 0;
+    if (col === "date") {
+      res = (a.date || "").localeCompare(b.date || "");
+    } else if (col === "local") {
+      res = (a.local || "").localeCompare(b.local || "", "es", { sensitivity: "base" });
+    } else if (col === "concept") {
+      res = (a.concept || "").localeCompare(b.concept || "", "es", { sensitivity: "base" });
+    } else if (col === "type") {
+      const at = a.type === "egreso" ? "2" : "1";
+      const bt = b.type === "egreso" ? "2" : "1";
+      res = at.localeCompare(bt);
+    } else if (col === "amount") {
+      res = (a.amount || 0) - (b.amount || 0);
+    } else {
+      res = String(a.id).localeCompare(String(b.id));
+    }
+    if (res === 0 && col !== "id") {
+      // desempate consistente
+      res = String(a.id).localeCompare(String(b.id));
+    }
+    return res * dir;
   });
   sorted.forEach((m) => {
     const tr = document.createElement("tr");
@@ -238,6 +261,94 @@ function renderTable() {
   recalcSummary();
   updateLocalDatalist();
   updateConceptDatalist();
+  updateSortUI();
+}
+
+function movementsToCSV(movements) {
+  const headers = ["Fecha", "Local", "Concepto", "Tipo", "Monto", "Notas"];
+  const escape = (value) => {
+    const str = (value ?? "").toString().replace(/\r?\n/g, " ");
+    const needsQuotes = /[",;]/.test(str);
+    const escaped = str.replace(/"/g, '""');
+    return needsQuotes ? `"${escaped}"` : escaped;
+  };
+  const rows = movements.map((m) => [
+    m.date || "",
+    m.local || "",
+    m.concept || "",
+    m.type === "egreso" ? "Egreso" : "Ingreso",
+    typeof m.amount === "number" ? String(m.amount).replace(".", ",") : "",
+    m.notes || "",
+  ]);
+  const lines = [headers, ...rows].map((cols) => cols.map(escape).join(";"));
+  return lines.join("\r\n");
+}
+
+function exportExcel() {
+  const all = state.movements || [];
+  if (!all.length) {
+    if (typeof alert !== "undefined") alert("No hay movimientos para exportar.");
+    return;
+  }
+  const csv = movementsToCSV(all);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `caja-movimientos-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("Exportado para Excel.");
+}
+
+function setSort(column) {
+  if (!column) return;
+  if (state.sortBy === column) {
+    state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+  } else {
+    state.sortBy = column;
+    state.sortDir = "asc";
+  }
+  renderTable();
+}
+
+function updateSortUI() {
+  const headers = document.querySelectorAll(".sort-header");
+  headers.forEach((el) => {
+    const col = el.dataset.sortCol;
+    const arrow = el.querySelector(".sort-arrow");
+    if (!arrow) return;
+    if (state.sortBy === col) {
+      arrow.textContent = state.sortDir === "asc" ? "▲" : "▼";
+      el.classList.add("sorted");
+      el.classList.toggle("sorted-desc", state.sortDir === "desc");
+    } else {
+      arrow.textContent = "↕";
+      el.classList.remove("sorted");
+      el.classList.remove("sorted-desc");
+    }
+  });
+}
+
+function exportExcelFiltered() {
+  const filtered = applyFilters(state.movements || []);
+  if (!filtered.length) {
+    if (typeof alert !== "undefined") alert("No hay movimientos filtrados para exportar.");
+    return;
+  }
+  const csv = movementsToCSV(filtered);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `caja-movimientos-filtrados-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("Exportado filtrado para Excel.");
 }
 
 function createCell(text) {
@@ -800,6 +911,10 @@ function setupEventListeners() {
 
   const btnExport = document.getElementById("btn-export");
   if (btnExport) btnExport.addEventListener("click", exportJSON);
+  const btnExportExcel = document.getElementById("btn-export-excel");
+  if (btnExportExcel) btnExportExcel.addEventListener("click", exportExcel);
+  const btnExportExcelFiltered = document.getElementById("btn-export-excel-filtered");
+  if (btnExportExcelFiltered) btnExportExcelFiltered.addEventListener("click", exportExcelFiltered);
 
   const fileImport = document.getElementById("file-import");
   if (fileImport) fileImport.addEventListener("change", (e) => {
@@ -810,6 +925,14 @@ function setupEventListeners() {
   ["filter-text", "filter-type", "filter-date-desde", "filter-date-hasta"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener(id === "filter-text" ? "input" : "change", renderTable);
+  });
+
+  const sortHeaders = document.querySelectorAll(".sort-header");
+  sortHeaders.forEach((el) => {
+    el.addEventListener("click", () => {
+      const col = el.dataset.sortCol;
+      setSort(col);
+    });
   });
   const btnClearDate = document.getElementById("btn-clear-date-filter");
   if (btnClearDate) btnClearDate.addEventListener("click", () => {
@@ -849,6 +972,10 @@ function setupEventListeners() {
   if (menuVer) menuVer.addEventListener("click", () => { openDeletedPanel(); closeMenu(); });
   const menuExport = document.getElementById("menu-export");
   if (menuExport) menuExport.addEventListener("click", () => { exportJSON(); closeMenu(); });
+  const menuExportExcel = document.getElementById("menu-export-excel");
+  if (menuExportExcel) menuExportExcel.addEventListener("click", () => { exportExcel(); closeMenu(); });
+  const menuExportExcelFiltered = document.getElementById("menu-export-excel-filtered");
+  if (menuExportExcelFiltered) menuExportExcelFiltered.addEventListener("click", () => { exportExcelFiltered(); closeMenu(); });
   const fileImportMenu = document.getElementById("file-import-menu");
   if (fileImportMenu) fileImportMenu.addEventListener("change", (e) => {
     const file = e.target.files?.[0];

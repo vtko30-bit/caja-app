@@ -79,6 +79,8 @@
             <div id="topbar-menu-dropdown" class="topbar-menu-dropdown hidden">
               <button type="button" class="menu-item" id="menu-ver-eliminados" style="display: none;">Ver eliminados</button>
               <button type="button" class="menu-item" id="menu-export">Exportar JSON</button>
+              <button type="button" class="menu-item" id="menu-export-excel">Exportar Excel (todo)</button>
+              <button type="button" class="menu-item" id="menu-export-excel-filtered">Exportar Excel (filtrado)</button>
               <label class="menu-item file-btn-label"><span>Importar JSON</span><input id="file-import-menu" type="file" accept="application/json" hidden /></label>
               <button type="button" class="menu-item menu-item-logout" id="menu-logout" style="display: none;">Cerrar sesión</button>
             </div>
@@ -91,6 +93,8 @@
             <button type="button" class="btn secondary" id="btn-logout" style="display: none;">Cerrar sesión</button>
             <button type="button" class="btn secondary" id="btn-ver-eliminados" style="display: none;">Ver eliminados</button>
             <button id="btn-export" class="btn secondary">Exportar JSON</button>
+            <button id="btn-export-excel" class="btn secondary">Exportar Excel (todo)</button>
+            <button id="btn-export-excel-filtered" class="btn secondary">Exportar Excel (filtrado)</button>
             <label class="btn secondary file-btn">
               Importar JSON
               <input id="file-import" type="file" accept="application/json" hidden />
@@ -239,11 +243,36 @@
           <table>
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Local</th>
-                <th>Concepto</th>
-                <th>Tipo</th>
-                <th>Monto</th>
+                <th>
+                  <button type="button" class="sort-header" data-sort-col="date">
+                    <span>Fecha</span>
+                    <span class="sort-arrow">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="sort-header" data-sort-col="local">
+                    <span>Local</span>
+                    <span class="sort-arrow">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="sort-header" data-sort-col="concept">
+                    <span>Concepto</span>
+                    <span class="sort-arrow">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="sort-header" data-sort-col="type">
+                    <span>Tipo</span>
+                    <span class="sort-arrow">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="sort-header" data-sort-col="amount">
+                    <span>Monto</span>
+                    <span class="sort-arrow">↕</span>
+                  </button>
+                </th>
                 <th>Notas</th>
                 <th></th>
               </tr>
