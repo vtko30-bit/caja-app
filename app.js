@@ -397,8 +397,8 @@ function applyRolePermissions() {
 
   const menuCreateUser = document.getElementById("menu-admin-create-user");
   if (menuCreateUser) menuCreateUser.classList.toggle("hidden", !isSuper);
-  const menuCreateUserDropdown = document.getElementById("menu-admin-create-user-dropdown");
-  if (menuCreateUserDropdown) menuCreateUserDropdown.classList.toggle("hidden", !isSuper);
+  const btnCreateUserTop = document.getElementById("btn-admin-create-user-top");
+  if (btnCreateUserTop) btnCreateUserTop.classList.toggle("hidden", !isSuper);
 }
 
 async function createUserViaAdminApi() {
@@ -1098,13 +1098,6 @@ function setupEventListeners() {
         if (type === "json") exportJSON();
         else if (type === "excel-all") exportExcel();
         else if (type === "excel-filtered") exportExcelFiltered();
-        else if (type === "admin-create-user") {
-          if (state.currentRole !== "super") {
-            closeExportMenu();
-            return;
-          }
-          createUserViaAdminApi();
-        }
         closeExportMenu();
       });
     });
@@ -1174,6 +1167,8 @@ function setupEventListeners() {
   if (menuExportExcelFiltered) menuExportExcelFiltered.addEventListener("click", () => { exportExcelFiltered(); closeMenu(); });
   const menuAdminCreateUser = document.getElementById("menu-admin-create-user");
   if (menuAdminCreateUser) menuAdminCreateUser.addEventListener("click", () => { createUserViaAdminApi(); closeMenu(); });
+  const btnAdminCreateUserTop = document.getElementById("btn-admin-create-user-top");
+  if (btnAdminCreateUserTop) btnAdminCreateUserTop.addEventListener("click", () => { createUserViaAdminApi(); });
   const fileImportMenu = document.getElementById("file-import-menu");
   if (fileImportMenu) fileImportMenu.addEventListener("change", (e) => {
     const file = e.target.files?.[0];
