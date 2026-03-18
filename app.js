@@ -724,6 +724,191 @@ async function openDeletedPanel() {
   showDeletedPanel();
 }
 
+// --- Administración (solo super) ---
+function showAdminPanel() {
+  const main = document.querySelector("main");
+  const panel = document.getElementById("panel-admin");
+  const deletedPanel = document.getElementById("panel-deleted");
+  if (main) main.classList.add("hidden");
+  if (deletedPanel) deletedPanel.classList.add("hidden");
+  if (panel) panel.classList.remove("hidden");
+}
+
+function hideAdminPanel() {
+  const main = document.querySelector("main");
+  const panel = document.getElementById("panel-admin");
+  const deletedPanel = document.getElementById("panel-deleted");
+  if (main) main.classList.remove("hidden");
+  if (deletedPanel) deletedPanel.classList.add("hidden");
+  if (panel) panel.classList.add("hidden");
+}
+
+async function getAccessTokenForAdminApi() {
+  const session = await getSession();
+  return session?.access_token || "";
+}
+
+function getUserRoleFromUserObj(u) {
+  const rawRole =
+    u?.user_metadata?.role ||
+    u?.raw_user_meta_data?.role ||
+    u?.app_metadata?.role ||
+    null;
+  if (rawRole === "super" || rawRole === "admin" || rawRole === "user") return rawRole;
+  if (rawRole === "full") return "super";
+  if (rawRole === "viewer") return "user";
+  return "user";
+}
+
+async function loadAdminUsers() {
+  const tbody = document.getElementById("admin-users-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const loadingRow = document.createElement("tr");
+  const td = document.createElement("td");
+  td.colSpan = 3;
+  td.textContent = "Cargando...";
+  loadingRow.appendChild(td);
+  tbody.appendChild(loadingRow);
+
+  const token = await getAccessTokenForAdminApi();
+  if (!token) {
+    tbody.innerHTML = "";
+    showToast("No hay sesión activa.");
+    return;
+  }
+
+  try {
+    const resp = await fetch("/api/admin/list-users", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({}),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      alert(data?.error || "No se pudo listar usuarios.");
+      tbody.innerHTML = "";
+      return;
+    }
+
+    const users = data?.users || [];
+    tbody.innerHTML = "";
+    if (!users.length) {
+      const empty = document.createElement("tr");
+      const tdEmpty = document.createElement("td");
+      tdEmpty.colSpan = 3;
+      tdEmpty.textContent = "No hay usuarios.";
+      empty.appendChild(tdEmpty);
+      tbody.appendChild(empty);
+      return;
+    }
+
+    users.forEach((u) => {
+      const userId = u?.id || u?.user_id || "";
+      const email = u?.email || "";
+      const role = getUserRoleFromUserObj(u);
+
+      const tr = document.createElement("tr");
+      tr.appendChild(createCell(email));
+
+      const tdRole = document.createElement("td");
+      const select = document.createElement("select");
+      select.value = role;
+      select.dataset.userId = userId;
+      ["super", "admin", "user"].forEach((r) => {
+        const opt = document.createElement("option");
+        opt.value = r;
+        opt.textContent = r;
+        if (r === role) opt.selected = true;
+        select.appendChild(opt);
+      });
+      tdRole.appendChild(select);
+      tr.appendChild(tdRole);
+
+      const tdActions = document.createElement("td");
+      const btnSave = document.createElement("button");
+      btnSave.type = "button";
+      btnSave.className = "btn secondary";
+      btnSave.textContent = "Guardar";
+      btnSave.addEventListener("click", async () => {
+        const nextRole = select.value;
+        const uid = select.dataset.userId;
+        await updateUserRoleAdmin(uid, nextRole);
+        await loadAdminUsers();
+      });
+      tdActions.appendChild(btnSave);
+      tr.appendChild(tdActions);
+
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    console.error(e);
+    alert("Error listando usuarios.");
+  }
+}
+
+async function updateUserRoleAdmin(userId, role) {
+  if (!userId) return;
+  const token = await getAccessTokenForAdminApi();
+  if (!token) {
+    alert("No hay sesión activa.");
+    return;
+  }
+  const resp = await fetch("/api/admin/update-user-role", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ userId, role }),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    alert(data?.error || "Error actualizando rol.");
+  } else {
+    showToast("Rol actualizado.");
+  }
+}
+
+async function createUserFromAdminPanel() {
+  const email = (document.getElementById("admin-create-email")?.value || "").trim();
+  const password = document.getElementById("admin-create-password")?.value || "";
+  const role = document.getElementById("admin-create-role")?.value || "user";
+
+  if (!email) return alert("Falta email.");
+  if (password.length < 6) return alert("La contraseña debe tener al menos 6 caracteres.");
+
+  const token = await getAccessTokenForAdminApi();
+  if (!token) return alert("No hay sesión activa.");
+
+  const resp = await fetch("/api/admin/create-user", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ email, password, role }),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    alert(data?.error || "Error al crear usuario.");
+    return;
+  }
+
+  showToast("Usuario creado correctamente.");
+  document.getElementById("admin-create-password").value = "";
+  await loadAdminUsers();
+}
+
+async function openAdminPanel() {
+  if (state.currentRole !== "super") return;
+  showAdminPanel();
+  await loadAdminUsers();
+}
+
 // --- Login / Auth (solo cuando useSupabase) ---
 function showLoginScreen() {
   const login = document.getElementById("login-screen");
@@ -1166,9 +1351,15 @@ function setupEventListeners() {
   const menuExportExcelFiltered = document.getElementById("menu-export-excel-filtered");
   if (menuExportExcelFiltered) menuExportExcelFiltered.addEventListener("click", () => { exportExcelFiltered(); closeMenu(); });
   const menuAdminCreateUser = document.getElementById("menu-admin-create-user");
-  if (menuAdminCreateUser) menuAdminCreateUser.addEventListener("click", () => { createUserViaAdminApi(); closeMenu(); });
+  if (menuAdminCreateUser) menuAdminCreateUser.addEventListener("click", () => { openAdminPanel(); closeMenu(); });
   const btnAdminCreateUserTop = document.getElementById("btn-admin-create-user-top");
-  if (btnAdminCreateUserTop) btnAdminCreateUserTop.addEventListener("click", () => { createUserViaAdminApi(); });
+  if (btnAdminCreateUserTop) btnAdminCreateUserTop.addEventListener("click", () => { openAdminPanel(); });
+
+  const btnVolverAdmin = document.getElementById("btn-volver-admin");
+  if (btnVolverAdmin) btnVolverAdmin.addEventListener("click", hideAdminPanel);
+
+  const btnAdminCreate = document.getElementById("btn-admin-create");
+  if (btnAdminCreate) btnAdminCreate.addEventListener("click", () => { createUserFromAdminPanel(); });
   const fileImportMenu = document.getElementById("file-import-menu");
   if (fileImportMenu) fileImportMenu.addEventListener("change", (e) => {
     const file = e.target.files?.[0];

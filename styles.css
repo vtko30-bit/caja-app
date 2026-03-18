@@ -862,6 +862,66 @@ body.offline-banner-visible {
   max-height: 60vh;
 }
 
+.panel-admin {
+  max-width: 1100px;
+  margin: 18px auto 28px;
+  padding: 0 18px 18px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-card {
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: radial-gradient(circle at top, rgba(51, 65, 85, 0.1), rgba(15, 23, 42, 0.94));
+  padding: 14px;
+}
+
+.admin-card h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.admin-form input,
+.admin-form select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.admin-form .btn {
+  align-self: flex-start;
+}
+
+#admin-users-body select {
+  width: 100%;
+  max-width: 140px;
+}
+
 @media (max-width: 860px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
