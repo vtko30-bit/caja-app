@@ -767,13 +767,53 @@ async function loadCurrentUserRole() {
     state.currentRole = "user";
     return "user";
   }
+
+  function decodeJwtPayload(token) {
+    try {
+      const parts = String(token || "").split(".");
+      if (parts.length < 2) return {};
+      let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      while (base64.length % 4) base64 += "=";
+      const jsonStr = atob(base64);
+      return JSON.parse(jsonStr);
+    } catch {
+      return {};
+    }
+  }
+
+  // 1) Intentar leer role desde el JWT (más fiable que depender del objeto user)
+  try {
+    const session = await supabase.auth.getSession();
+    const token = session?.data?.session?.access_token || session?.access_token || "";
+    const payload = decodeJwtPayload(token);
+    const rawRoleFromJwt =
+      payload?.user_metadata?.role || payload?.user_metadata?.role || payload?.role || null;
+
+    if (rawRoleFromJwt) {
+      const mapped =
+        rawRoleFromJwt === "super" || rawRoleFromJwt === "admin" || rawRoleFromJwt === "user"
+          ? rawRoleFromJwt
+          : rawRoleFromJwt === "full"
+            ? "super"
+            : rawRoleFromJwt === "viewer"
+              ? "user"
+              : "user";
+      state.currentRole = mapped;
+      return mapped;
+    }
+  } catch {
+    // seguir con fallback
+  }
+
+  // 2) Fallback: intentar leer desde auth.getUser()
   const { data, error } = await supabase.auth.getUser();
   if (error) {
     console.warn("No se pudo obtener el usuario actual:", error);
     state.currentRole = "user";
     return "user";
   }
-  const rawRole = data?.user?.user_metadata?.role;
+
+  const rawRole = data?.user?.user_metadata?.role || data?.user?.app_metadata?.role || null;
   const role =
     rawRole === "super" || rawRole === "admin" || rawRole === "user"
       ? rawRole
