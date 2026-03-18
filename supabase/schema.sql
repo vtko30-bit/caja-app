@@ -29,7 +29,18 @@ CREATE POLICY "Permitir todo para anon" ON public.movements
   WITH CHECK (true);
 
 -- Habilitar Realtime para la tabla (si da error "already exists", ignorar)
-ALTER PUBLICATION supabase_realtime ADD TABLE public.movements;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE schemaname = 'public'
+      AND tablename = 'movements'
+      AND pubname = 'supabase_realtime'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.movements;
+  END IF;
+END $$;
 
 -- Tabla ACL: permisos por módulo y usuario
 CREATE TABLE IF NOT EXISTS public.user_module_permissions (
