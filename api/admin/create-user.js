@@ -80,7 +80,34 @@ module.exports = async (req, res) => {
       });
     }
 
-    return json(res, 201, { ok: true, user: createData?.user || createData });
+    const createdUser = createData?.user || createData;
+    const userId = createdUser?.id || createdUser?.user_id || createdUser?.user?.id || "";
+    const canRead = true;
+    const canWrite = nextRole === "super" ? true : false;
+
+    if (userId) {
+      // Inicializar permisos para el módulo movements
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/user_module_permissions?on_conflict=user_id,module`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates",
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            module: "movements",
+            can_read: canRead,
+            can_write: canWrite,
+          }),
+        },
+      ).catch(() => {});
+    }
+
+    return json(res, 201, { ok: true, user: createdUser });
   } catch (e) {
     console.error(e);
     return json(res, 500, { error: "Error interno" });

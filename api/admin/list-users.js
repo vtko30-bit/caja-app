@@ -45,7 +45,34 @@ module.exports = async (req, res) => {
     }
 
     const users = listData?.users || listData?.data || listData || [];
-    return json(res, 200, { users });
+
+    // Permisos por módulo (movements)
+    const permsResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/user_module_permissions?module=eq.movements&select=user_id,can_read,can_write&per_page=100&page=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+        },
+      },
+    );
+    const permsData = await permsResp.json().catch(() => ({}));
+    const perms = Array.isArray(permsData) ? permsData : permsData?.data || permsData?.user_module_permissions || [];
+    const permsByUserId = {};
+    perms.forEach((p) => {
+      if (!p?.user_id) return;
+      permsByUserId[p.user_id] = p;
+    });
+
+    const usersWithPerms = (users || []).map((u) => {
+      const userId = u?.id || u?.user_id || "";
+      const perm = permsByUserId[userId];
+      const canRead = perm?.can_read ?? true;
+      const canWrite = perm?.can_write ?? false;
+      return { ...u, can_read_movements: canRead, can_write_movements: canWrite };
+    });
+
+    return json(res, 200, { users: usersWithPerms });
   } catch (e) {
     console.error(e);
     return json(res, 500, { error: "Error interno" });

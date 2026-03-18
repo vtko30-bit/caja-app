@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
     if (!accessToken) return json(res, 401, { error: "Falta access token" });
 
     const ok = await verifySuper(accessToken);
-    if (!ok) return json(res, 403, { error: "Solo super puede modificar roles" });
+    if (!ok) return json(res, 403, { error: "Solo super puede modificar permisos" });
 
     const contentType = req.headers["content-type"] || "";
     const bodyRaw = await new Promise((resolve, reject) => {
@@ -39,36 +39,18 @@ module.exports = async (req, res) => {
       req.on("end", () => resolve(data));
       req.on("error", reject);
     });
+
     let body = {};
-    try {
-      if (contentType.includes("application/json") && bodyRaw) body = JSON.parse(bodyRaw);
-    } catch {}
-
-    const { userId, role } = body || {};
-    if (!userId || !role) return json(res, 400, { error: "Faltan userId o role" });
-    const allowedRoles = ["super", "admin", "user"];
-    const nextRole = allowedRoles.includes(role) ? role : "user";
-
-    const patchResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_metadata: { role: nextRole },
-      }),
-    });
-
-    const patchData = await patchResp.json().catch(() => ({}));
-    if (!patchResp.ok) {
-      return json(res, patchResp.status || 400, { error: patchData?.message || patchData?.error || "No se pudo actualizar" });
+    if (contentType.includes("application/json") && bodyRaw) {
+      try { body = JSON.parse(bodyRaw); } catch {}
     }
 
-    // Asegurar que exista la fila de permisos del módulo actual.
-    const canRead = true;
-    const canWrite = nextRole === "super" ? true : false;
+    const { userId, module, can_read, can_write } = body || {};
+    if (!userId || !module) return json(res, 400, { error: "Faltan userId o module" });
+
+    const nextCanRead = !!can_read;
+    const nextCanWrite = !!can_write;
+
     await fetch(`${SUPABASE_URL}/rest/v1/user_module_permissions?on_conflict=user_id,module`, {
       method: "POST",
       headers: {
@@ -79,13 +61,13 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         user_id: userId,
-        module: "movements",
-        can_read: canRead,
-        can_write: canWrite,
+        module,
+        can_read: nextCanRead,
+        can_write: nextCanWrite,
       }),
-    }).catch(() => {});
+    });
 
-    return json(res, 200, { ok: true, user: patchData?.user || patchData });
+    return json(res, 200, { ok: true });
   } catch (e) {
     console.error(e);
     return json(res, 500, { error: "Error interno" });

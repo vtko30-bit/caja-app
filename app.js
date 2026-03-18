@@ -27,6 +27,10 @@ let state = {
   sortBy: "date",
   sortDir: "asc",
   currentRole: "user",
+  movementsPermissions: {
+    can_read: true,
+    can_write: false,
+  },
 };
 
 function rowToMovement(row) {
@@ -356,45 +360,53 @@ function exportExcelFiltered() {
 function applyRolePermissions() {
   const role = state.currentRole || "user";
   const isSuper = role === "super";
-  const isAdmin = role === "admin";
-  const isUser = role === "user";
 
-  const canWrite = isSuper || isAdmin;
-  const canImport = isSuper;
-  const canDelete = isSuper;
-  const canViewDeleted = isSuper;
+  const perms = state.movementsPermissions || { can_read: true, can_write: false };
+  const canReadMovements = isSuper || !!perms.can_read;
+  const canWriteMovements = isSuper || !!perms.can_write;
+
+  const canImport = canWriteMovements;
+  const canDelete = canWriteMovements;
+  const canViewDeleted = canReadMovements;
 
   const form = document.getElementById("movement-form");
   if (form) {
     const submitBtn = form.querySelector("button[type='submit']");
-    if (submitBtn) submitBtn.disabled = !canWrite;
+    if (submitBtn) submitBtn.disabled = !canWriteMovements;
     const clearBtn = document.getElementById("btn-clear-form");
-    if (clearBtn) clearBtn.disabled = isUser;
+    if (clearBtn) clearBtn.disabled = !canWriteMovements;
 
-    // Para "user" deshabilitamos inputs para que se vea claramente el modo solo lectura.
+    // Lectura deshabilita el formulario completo.
     form.querySelectorAll("input, select, textarea").forEach((el) => {
-      el.disabled = isUser;
+      el.disabled = !canWriteMovements;
     });
   }
 
-  document.querySelectorAll(".edit-btn").forEach((btn) => {
-    btn.disabled = !canWrite;
-  });
-
-  document.querySelectorAll(".delete-btn").forEach((btn) => {
-    btn.disabled = !canDelete;
-  });
+  document.querySelectorAll(".edit-btn").forEach((btn) => { btn.disabled = !canWriteMovements; });
+  document.querySelectorAll(".delete-btn").forEach((btn) => { btn.disabled = !canDelete; });
 
   const fileImport = document.getElementById("file-import");
   if (fileImport) fileImport.disabled = !canImport;
   const fileImportMenu = document.getElementById("file-import-menu");
   if (fileImportMenu) fileImportMenu.disabled = !canImport;
 
+  // Panel de eliminados solo si puede leer.
   const btnVerEliminados = document.getElementById("btn-ver-eliminados");
   if (btnVerEliminados) btnVerEliminados.style.display = canViewDeleted ? "" : "none";
   const menuVer = document.getElementById("menu-ver-eliminados");
   if (menuVer) menuVer.style.display = canViewDeleted ? "" : "none";
 
+  // Deshabilitar exportaciones si no puede leer.
+  const btnExportMain = document.getElementById("btn-export-main");
+  if (btnExportMain) btnExportMain.disabled = !canReadMovements;
+  const exportOptions = document.querySelectorAll("#export-dropdown-menu .export-option");
+  exportOptions.forEach((b) => { b.disabled = !canReadMovements; });
+  ["menu-export", "menu-export-excel", "menu-export-excel-filtered"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !canReadMovements;
+  });
+
+  // Crear usuarios (solo super) en UI.
   const menuCreateUser = document.getElementById("menu-admin-create-user");
   if (menuCreateUser) menuCreateUser.classList.toggle("hidden", !isSuper);
   const btnCreateUserTop = document.getElementById("btn-admin-create-user-top");
@@ -766,7 +778,7 @@ async function loadAdminUsers() {
   tbody.innerHTML = "";
   const loadingRow = document.createElement("tr");
   const td = document.createElement("td");
-  td.colSpan = 3;
+  td.colSpan = 5;
   td.textContent = "Cargando...";
   loadingRow.appendChild(td);
   tbody.appendChild(loadingRow);
@@ -799,7 +811,7 @@ async function loadAdminUsers() {
     if (!users.length) {
       const empty = document.createElement("tr");
       const tdEmpty = document.createElement("td");
-      tdEmpty.colSpan = 3;
+      tdEmpty.colSpan = 5;
       tdEmpty.textContent = "No hay usuarios.";
       empty.appendChild(tdEmpty);
       tbody.appendChild(empty);
@@ -810,9 +822,25 @@ async function loadAdminUsers() {
       const userId = u?.id || u?.user_id || "";
       const email = u?.email || "";
       const role = getUserRoleFromUserObj(u);
+      const canReadMovements = role === "super" ? true : !!u?.can_read_movements;
+      const canWriteMovements = role === "super" ? true : !!u?.can_write_movements;
 
       const tr = document.createElement("tr");
       tr.appendChild(createCell(email));
+
+      const tdRead = document.createElement("td");
+      const cbRead = document.createElement("input");
+      cbRead.type = "checkbox";
+      cbRead.checked = canReadMovements;
+      tdRead.appendChild(cbRead);
+      tr.appendChild(tdRead);
+
+      const tdWrite = document.createElement("td");
+      const cbWrite = document.createElement("input");
+      cbWrite.type = "checkbox";
+      cbWrite.checked = canWriteMovements;
+      tdWrite.appendChild(cbWrite);
+      tr.appendChild(tdWrite);
 
       const tdRole = document.createElement("td");
       const select = document.createElement("select");
@@ -837,6 +865,7 @@ async function loadAdminUsers() {
         const nextRole = select.value;
         const uid = select.dataset.userId;
         await updateUserRoleAdmin(uid, nextRole);
+        await updateMovementsPermissionsAdmin(uid, cbRead.checked, cbWrite.checked);
         await loadAdminUsers();
       });
       tdActions.appendChild(btnSave);
@@ -870,6 +899,36 @@ async function updateUserRoleAdmin(userId, role) {
     alert(data?.error || "Error actualizando rol.");
   } else {
     showToast("Rol actualizado.");
+  }
+}
+
+async function updateMovementsPermissionsAdmin(userId, canRead, canWrite) {
+  if (!userId) return;
+  const token = await getAccessTokenForAdminApi();
+  if (!token) {
+    alert("No hay sesión activa.");
+    return;
+  }
+
+  const resp = await fetch("/api/admin/update-module-permissions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      userId,
+      module: "movements",
+      can_read: !!canRead,
+      can_write: !!canWrite,
+    }),
+  });
+
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    alert(data?.error || "Error actualizando permisos.");
+  } else {
+    showToast("Permisos actualizados.");
   }
 }
 
@@ -1009,6 +1068,34 @@ async function loadCurrentUserRole() {
           : "user";
   state.currentRole = role;
   return role;
+}
+
+async function loadMyMovementsPermissions() {
+  // Defaults para evitar quedar bloqueado en caso de error.
+  state.movementsPermissions = { can_read: true, can_write: false };
+  if (!state.useSupabase) return;
+  const supabase = getSupabase();
+  if (!supabase) return;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
+    if (!userId) return;
+
+    const { data, error } = await supabase
+      .from("user_module_permissions")
+      .select("can_read,can_write")
+      .eq("module", "movements")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error || !data) return;
+    state.movementsPermissions = {
+      can_read: !!data.can_read,
+      can_write: !!data.can_write,
+    };
+  } catch (e) {
+    console.warn("No se pudo cargar permisos del módulo:", e);
+  }
 }
 
 function getLoginEmailPassword() {
@@ -1246,6 +1333,7 @@ async function initAppContent() {
   syncMenuVisibility();
   setupEventListeners();
   setupOfflineDetection();
+  await loadMyMovementsPermissions();
   state.movements = await loadMovements();
   renderTable();
   applyRolePermissions();
