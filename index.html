@@ -24,10 +24,17 @@
             <label for="login-password">Contraseña</label>
             <input id="login-password" name="password" type="password" required placeholder="••••••••" autocomplete="current-password" />
           </div>
+          <div class="field hidden">
+            <label for="login-role">Tipo de usuario (solo al crear cuenta)</label>
+            <select id="login-role" name="role">
+              <option value="full" selected>Completo (puede cargar y editar datos)</option>
+              <option value="viewer">Solo lectura (no puede cargar ni editar)</option>
+            </select>
+          </div>
           <p id="login-message" class="login-message hidden"></p>
           <div class="login-actions">
             <button type="button" class="btn primary" id="btn-login-entrar">Entrar</button>
-            <button type="button" class="btn secondary" id="btn-login-crear">Crear cuenta</button>
+            <button type="button" class="btn secondary hidden" id="btn-login-crear">Crear cuenta</button>
           </div>
           <p class="login-link-wrap">
             <button type="button" class="btn-link" id="btn-olvide-password">¿Olvidaste tu contraseña?</button>
@@ -81,6 +88,7 @@
               <button type="button" class="menu-item" id="menu-export">Exportar JSON</button>
               <button type="button" class="menu-item" id="menu-export-excel">Exportar Excel (todo)</button>
               <button type="button" class="menu-item" id="menu-export-excel-filtered">Exportar Excel (filtrado)</button>
+              <button type="button" class="menu-item hidden" id="menu-admin-create-user">Crear usuario</button>
               <label class="menu-item file-btn-label"><span>Importar JSON</span><input id="file-import-menu" type="file" accept="application/json" hidden /></label>
               <button type="button" class="menu-item menu-item-logout" id="menu-logout" style="display: none;">Cerrar sesión</button>
             </div>
@@ -92,9 +100,18 @@
           <div class="topbar-actions">
             <button type="button" class="btn secondary" id="btn-logout" style="display: none;">Cerrar sesión</button>
             <button type="button" class="btn secondary" id="btn-ver-eliminados" style="display: none;">Ver eliminados</button>
-            <button id="btn-export" class="btn secondary">Exportar JSON</button>
-            <button id="btn-export-excel" class="btn secondary">Exportar Excel (todo)</button>
-            <button id="btn-export-excel-filtered" class="btn secondary">Exportar Excel (filtrado)</button>
+            <div class="export-dropdown">
+              <button id="btn-export-main" class="btn secondary export-toggle" type="button">
+                Exportar
+                <span class="export-toggle-icon">▾</span>
+              </button>
+              <div id="export-dropdown-menu" class="export-dropdown-menu hidden">
+                <button type="button" class="export-option" data-export="json">Exportar JSON</button>
+                <button type="button" class="export-option" data-export="excel-all">Exportar Excel (todo)</button>
+                <button type="button" class="export-option" data-export="excel-filtered">Exportar Excel (filtrado)</button>
+                <button type="button" class="export-option hidden" id="menu-admin-create-user-dropdown" data-export="admin-create-user">Crear usuario</button>
+              </div>
+            </div>
             <label class="btn secondary file-btn">
               Importar JSON
               <input id="file-import" type="file" accept="application/json" hidden />

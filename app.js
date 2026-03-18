@@ -26,6 +26,7 @@ let state = {
   realtimeSubscription: null,
   sortBy: "date",
   sortDir: "asc",
+  currentRole: "user",
 };
 
 function rowToMovement(row) {
@@ -262,6 +263,7 @@ function renderTable() {
   updateLocalDatalist();
   updateConceptDatalist();
   updateSortUI();
+  applyRolePermissions();
 }
 
 function movementsToCSV(movements) {
@@ -349,6 +351,99 @@ function exportExcelFiltered() {
   a.remove();
   URL.revokeObjectURL(url);
   showToast("Exportado filtrado para Excel.");
+}
+
+function applyRolePermissions() {
+  const role = state.currentRole || "user";
+  const isSuper = role === "super";
+  const isAdmin = role === "admin";
+  const isUser = role === "user";
+
+  const canWrite = isSuper || isAdmin;
+  const canImport = isSuper;
+  const canDelete = isSuper;
+  const canViewDeleted = isSuper;
+
+  const form = document.getElementById("movement-form");
+  if (form) {
+    const submitBtn = form.querySelector("button[type='submit']");
+    if (submitBtn) submitBtn.disabled = !canWrite;
+    const clearBtn = document.getElementById("btn-clear-form");
+    if (clearBtn) clearBtn.disabled = isUser;
+
+    // Para "user" deshabilitamos inputs para que se vea claramente el modo solo lectura.
+    form.querySelectorAll("input, select, textarea").forEach((el) => {
+      el.disabled = isUser;
+    });
+  }
+
+  document.querySelectorAll(".edit-btn").forEach((btn) => {
+    btn.disabled = !canWrite;
+  });
+
+  document.querySelectorAll(".delete-btn").forEach((btn) => {
+    btn.disabled = !canDelete;
+  });
+
+  const fileImport = document.getElementById("file-import");
+  if (fileImport) fileImport.disabled = !canImport;
+  const fileImportMenu = document.getElementById("file-import-menu");
+  if (fileImportMenu) fileImportMenu.disabled = !canImport;
+
+  const btnVerEliminados = document.getElementById("btn-ver-eliminados");
+  if (btnVerEliminados) btnVerEliminados.style.display = canViewDeleted ? "" : "none";
+  const menuVer = document.getElementById("menu-ver-eliminados");
+  if (menuVer) menuVer.style.display = canViewDeleted ? "" : "none";
+
+  const menuCreateUser = document.getElementById("menu-admin-create-user");
+  if (menuCreateUser) menuCreateUser.classList.toggle("hidden", !isSuper);
+  const menuCreateUserDropdown = document.getElementById("menu-admin-create-user-dropdown");
+  if (menuCreateUserDropdown) menuCreateUserDropdown.classList.toggle("hidden", !isSuper);
+}
+
+async function createUserViaAdminApi() {
+  try {
+    const email = (window.prompt("Email del nuevo usuario:") || "").trim();
+    if (!email) return;
+
+    const password = window.prompt("Contraseña del nuevo usuario (mín. 6):") || "";
+    if (password.length < 6) {
+      alert("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    const roleInput = (window.prompt("Rol: escribe 'super', 'admin' o 'user':", "user") || "").trim();
+    const role = (roleInput === "super" || roleInput === "admin" || roleInput === "user") ? roleInput : "user";
+
+    const session = await getSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      alert("No hay sesión activa. Recarga la página e inicia sesión nuevamente.");
+      return;
+    }
+
+    const resp = await fetch("/api/admin/create-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ email, password, role }),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const msg = data?.error || data?.message || "Error al crear usuario.";
+      alert(msg);
+      showToast("No se pudo crear el usuario.");
+      return;
+    }
+
+    showToast("Usuario creado correctamente.");
+  } catch (e) {
+    console.error(e);
+    alert("Error inesperado creando el usuario.");
+  }
 }
 
 function createCell(text) {
@@ -666,12 +761,38 @@ async function getSession() {
   return session;
 }
 
+async function loadCurrentUserRole() {
+  const supabase = getSupabase();
+  if (!supabase) {
+    state.currentRole = "user";
+    return "user";
+  }
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    console.warn("No se pudo obtener el usuario actual:", error);
+    state.currentRole = "user";
+    return "user";
+  }
+  const rawRole = data?.user?.user_metadata?.role;
+  const role =
+    rawRole === "super" || rawRole === "admin" || rawRole === "user"
+      ? rawRole
+      : rawRole === "full"
+        ? "super"
+        : rawRole === "viewer"
+          ? "user"
+          : "user";
+  state.currentRole = role;
+  return role;
+}
+
 function getLoginEmailPassword() {
   const form = document.getElementById("login-form");
-  if (!form) return { email: "", password: "" };
+  if (!form) return { email: "", password: "", role: "full" };
   const email = (form.email?.value || "").trim();
   const password = form.password?.value || "";
-  return { email, password };
+  const role = form.role?.value || "full";
+  return { email, password, role };
 }
 
 async function doLogin() {
@@ -696,6 +817,7 @@ async function doLogin() {
   const btnCrear = document.getElementById("btn-login-crear");
   if (btnEntrar) btnEntrar.disabled = true;
   if (btnCrear) btnCrear.disabled = true;
+  await loadCurrentUserRole();
   await initAppContent();
   if (btnEntrar) btnEntrar.disabled = false;
   if (btnCrear) btnCrear.disabled = false;
@@ -704,7 +826,9 @@ async function doLogin() {
 }
 
 async function doSignUp() {
-  const { email, password } = getLoginEmailPassword();
+  setLoginError("La creación de cuentas está deshabilitada. Contacta a un usuario super.");
+  return;
+  const { email, password, role } = getLoginEmailPassword();
   if (!email || !password) {
     setLoginError("Completa correo y contraseña.");
     return;
@@ -719,7 +843,13 @@ async function doSignUp() {
     setLoginError("Error de conexión. Recarga la página.");
     return;
   }
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { role: role === "viewer" ? "viewer" : "full" },
+    },
+  });
   if (error) {
     const msg = (error.message || "").toLowerCase();
     if (msg.includes("rate limit") || msg.includes("rate_limit") || msg.includes("exceeded")) {
@@ -748,6 +878,7 @@ async function doSignUp() {
   const btnCrear = document.getElementById("btn-login-crear");
   if (btnEntrar) btnEntrar.disabled = true;
   if (btnCrear) btnCrear.disabled = true;
+  await loadCurrentUserRole();
   await initAppContent();
   if (btnEntrar) btnEntrar.disabled = false;
   if (btnCrear) btnCrear.disabled = false;
@@ -892,6 +1023,7 @@ async function initAppContent() {
   setupOfflineDetection();
   state.movements = await loadMovements();
   renderTable();
+  applyRolePermissions();
   setupRealtime();
 }
 
@@ -909,12 +1041,36 @@ function setupEventListeners() {
     else if (dateInput) { dateInput.focus(); dateInput.click(); }
   });
 
-  const btnExport = document.getElementById("btn-export");
-  if (btnExport) btnExport.addEventListener("click", exportJSON);
-  const btnExportExcel = document.getElementById("btn-export-excel");
-  if (btnExportExcel) btnExportExcel.addEventListener("click", exportExcel);
-  const btnExportExcelFiltered = document.getElementById("btn-export-excel-filtered");
-  if (btnExportExcelFiltered) btnExportExcelFiltered.addEventListener("click", exportExcelFiltered);
+  const btnExportMain = document.getElementById("btn-export-main");
+  const exportMenu = document.getElementById("export-dropdown-menu");
+  function closeExportMenu() {
+    if (exportMenu) exportMenu.classList.add("hidden");
+  }
+  if (btnExportMain && exportMenu) {
+    btnExportMain.addEventListener("click", (e) => {
+      e.stopPropagation();
+      exportMenu.classList.toggle("hidden");
+    });
+    const options = exportMenu.querySelectorAll(".export-option");
+    options.forEach((opt) => {
+      opt.addEventListener("click", (e) => {
+        const type = opt.dataset.export;
+        if (type === "json") exportJSON();
+        else if (type === "excel-all") exportExcel();
+        else if (type === "excel-filtered") exportExcelFiltered();
+        else if (type === "admin-create-user") {
+          if (state.currentRole !== "super") {
+            closeExportMenu();
+            return;
+          }
+          createUserViaAdminApi();
+        }
+        closeExportMenu();
+      });
+    });
+    document.body.addEventListener("click", () => closeExportMenu());
+    exportMenu.addEventListener("click", (e) => e.stopPropagation());
+  }
 
   const fileImport = document.getElementById("file-import");
   if (fileImport) fileImport.addEventListener("change", (e) => {
@@ -976,6 +1132,8 @@ function setupEventListeners() {
   if (menuExportExcel) menuExportExcel.addEventListener("click", () => { exportExcel(); closeMenu(); });
   const menuExportExcelFiltered = document.getElementById("menu-export-excel-filtered");
   if (menuExportExcelFiltered) menuExportExcelFiltered.addEventListener("click", () => { exportExcelFiltered(); closeMenu(); });
+  const menuAdminCreateUser = document.getElementById("menu-admin-create-user");
+  if (menuAdminCreateUser) menuAdminCreateUser.addEventListener("click", () => { createUserViaAdminApi(); closeMenu(); });
   const fileImportMenu = document.getElementById("file-import-menu");
   if (fileImportMenu) fileImportMenu.addEventListener("change", (e) => {
     const file = e.target.files?.[0];
