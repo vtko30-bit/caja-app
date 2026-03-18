@@ -1237,6 +1237,7 @@ async function init() {
         }
         return;
       }
+      await loadCurrentUserRole();
       showAppContent();
     }
 
