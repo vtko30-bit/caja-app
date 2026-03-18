@@ -45,3 +45,19 @@ CREATE TABLE IF NOT EXISTS public.user_module_permissions (
 CREATE INDEX IF NOT EXISTS idx_user_module_permissions_module ON public.user_module_permissions (module);
 
 ALTER TABLE public.user_module_permissions ENABLE ROW LEVEL SECURITY;
+
+-- Inicializar permisos por defecto (todos pueden leer, nadie puede escribir)
+-- Importante: los usuarios 'super' igualmente tienen bypass por RLS en auth-policies.sql.
+INSERT INTO public.user_module_permissions (user_id, module, can_read, can_write)
+SELECT
+  u.id,
+  'movements',
+  true AS can_read,
+  false AS can_write
+FROM auth.users u
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM public.user_module_permissions p
+  WHERE p.user_id = u.id
+    AND p.module = 'movements'
+);
