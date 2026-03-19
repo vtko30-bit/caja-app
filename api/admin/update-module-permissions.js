@@ -51,7 +51,7 @@ module.exports = async (req, res) => {
     const nextCanRead = !!can_read;
     const nextCanWrite = !!can_write;
 
-    await fetch(`${SUPABASE_URL}/rest/v1/user_module_permissions?on_conflict=user_id,module`, {
+    const upsertResp = await fetch(`${SUPABASE_URL}/rest/v1/user_module_permissions?on_conflict=user_id,module`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
@@ -66,6 +66,12 @@ module.exports = async (req, res) => {
         can_write: nextCanWrite,
       }),
     });
+
+    if (!upsertResp.ok) {
+      const errData = await upsertResp.json().catch(() => ({}));
+      const errMsg = errData?.message || errData?.error || errData?.hint || "Error al guardar permisos";
+      return json(res, upsertResp.status || 400, { error: errMsg });
+    }
 
     return json(res, 200, { ok: true });
   } catch (e) {

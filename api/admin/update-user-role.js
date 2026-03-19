@@ -50,7 +50,7 @@ module.exports = async (req, res) => {
     const nextRole = allowedRoles.includes(role) ? role : "user";
 
     const patchResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
-      method: "PATCH",
+      method: "PUT",
       headers: {
         Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -63,7 +63,8 @@ module.exports = async (req, res) => {
 
     const patchData = await patchResp.json().catch(() => ({}));
     if (!patchResp.ok) {
-      return json(res, patchResp.status || 400, { error: patchData?.message || patchData?.error || "No se pudo actualizar" });
+      const errMsg = patchData?.msg || patchData?.message || patchData?.error || "No se pudo actualizar";
+      return json(res, patchResp.status || 400, { error: errMsg });
     }
 
     // Asegurar que exista la fila de permisos del módulo actual.

@@ -56,20 +56,22 @@
         </div>
 
         <div id="login-new-password-view" class="login-extra-view hidden">
-          <h3 class="login-extra-title">Nueva contraseña</h3>
-          <p class="login-subtitle">Elige una contraseña de al menos 6 caracteres.</p>
-          <div class="field">
-            <label for="new-password">Contraseña</label>
-            <input id="new-password" type="password" placeholder="••••••••" autocomplete="new-password" />
-          </div>
-          <div class="field">
-            <label for="new-password-repeat">Repetir contraseña</label>
-            <input id="new-password-repeat" type="password" placeholder="••••••••" autocomplete="new-password" />
-          </div>
-          <p id="new-password-message" class="login-message hidden"></p>
-          <div class="login-actions">
-            <button type="button" class="btn primary" id="btn-guardar-password">Guardar contraseña</button>
-          </div>
+          <form id="form-new-password" role="form" onsubmit="return false;">
+            <h3 class="login-extra-title">Nueva contraseña</h3>
+            <p class="login-subtitle">Elige una contraseña de al menos 6 caracteres.</p>
+            <div class="field">
+              <label for="new-password">Contraseña</label>
+              <input id="new-password" type="password" placeholder="••••••••" autocomplete="new-password" />
+            </div>
+            <div class="field">
+              <label for="new-password-repeat">Repetir contraseña</label>
+              <input id="new-password-repeat" type="password" placeholder="••••••••" autocomplete="new-password" />
+            </div>
+            <p id="new-password-message" class="login-message hidden"></p>
+            <div class="login-actions">
+              <button type="button" class="btn primary" id="btn-guardar-password">Guardar contraseña</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
@@ -333,7 +335,7 @@
       <div class="admin-grid">
         <div class="admin-card">
           <h3>Crear usuario</h3>
-          <div class="admin-form">
+          <form class="admin-form" id="form-admin-create" role="form" onsubmit="return false;">
             <label>
               Email
               <input id="admin-create-email" type="email" autocomplete="email" />
@@ -351,7 +353,7 @@
               </select>
             </label>
             <button type="button" class="btn primary" id="btn-admin-create">Crear</button>
-          </div>
+          </form>
         </div>
 
         <div class="admin-card">

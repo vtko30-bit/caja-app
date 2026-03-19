@@ -4,6 +4,8 @@ const STORAGE_KEY = "caja_movimientos_v1";
 const supabaseUrl = (typeof window !== "undefined" && window.CAJA_SUPABASE_URL) || "";
 const supabaseAnonKey = (typeof window !== "undefined" && window.CAJA_SUPABASE_ANON_KEY) || "";
 const useSupabase = !!(supabaseUrl && supabaseAnonKey);
+// Base URL para la API (vacío = mismo origen). En local puedes definir window.CAJA_API_BASE = "https://tu-app.vercel.app"
+const API_BASE = typeof window !== "undefined" && window.CAJA_API_BASE !== undefined ? window.CAJA_API_BASE : "";
 let supabaseClient = null;
 function getSupabase() {
   if (!useSupabase || !supabaseUrl || !supabaseAnonKey) return null;
@@ -434,7 +436,7 @@ async function createUserViaAdminApi() {
       return;
     }
 
-    const resp = await fetch("/api/admin/create-user", {
+    const resp = await fetch(`${API_BASE}/api/admin/create-user`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -445,8 +447,8 @@ async function createUserViaAdminApi() {
 
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      const msg = data?.error || data?.message || "Error al crear usuario.";
-      alert(msg);
+      if (resp.status === 404) alert("La API no está disponible (404). Si estás en local, ejecuta 'vercel dev' o abre la app desde la URL desplegada en Vercel.");
+      else alert(data?.error || data?.message || "Error al crear usuario.");
       showToast("No se pudo crear el usuario.");
       return;
     }
@@ -791,7 +793,7 @@ async function loadAdminUsers() {
   }
 
   try {
-    const resp = await fetch("/api/admin/list-users", {
+    const resp = await fetch(`${API_BASE}/api/admin/list-users`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -801,7 +803,8 @@ async function loadAdminUsers() {
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      alert(data?.error || "No se pudo listar usuarios.");
+      if (resp.status === 404) alert("La API no está disponible (404). Si estás en local, ejecuta 'vercel dev' o abre la app desde la URL desplegada en Vercel.");
+      else alert(data?.error || "No se pudo listar usuarios.");
       tbody.innerHTML = "";
       return;
     }
@@ -846,6 +849,7 @@ async function loadAdminUsers() {
       const select = document.createElement("select");
       select.value = role;
       select.dataset.userId = userId;
+      select.dataset.originalRole = role;
       ["super", "admin", "user"].forEach((r) => {
         const opt = document.createElement("option");
         opt.value = r;
@@ -864,9 +868,11 @@ async function loadAdminUsers() {
       btnSave.addEventListener("click", async () => {
         const nextRole = select.value;
         const uid = select.dataset.userId;
-        await updateUserRoleAdmin(uid, nextRole);
+        const roleChanged = nextRole !== (select.dataset.originalRole || "");
+        if (roleChanged) await updateUserRoleAdmin(uid, nextRole);
         await updateMovementsPermissionsAdmin(uid, cbRead.checked, cbWrite.checked);
         await loadAdminUsers();
+        if (roleChanged) select.dataset.originalRole = nextRole;
       });
       tdActions.appendChild(btnSave);
       tr.appendChild(tdActions);
@@ -886,7 +892,7 @@ async function updateUserRoleAdmin(userId, role) {
     alert("No hay sesión activa.");
     return;
   }
-  const resp = await fetch("/api/admin/update-user-role", {
+  const resp = await fetch(`${API_BASE}/api/admin/update-user-role`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -896,7 +902,8 @@ async function updateUserRoleAdmin(userId, role) {
   });
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) {
-    alert(data?.error || "Error actualizando rol.");
+    if (resp.status === 404) alert("La API no está disponible (404). Si estás en local, ejecuta 'vercel dev' o abre la app desde la URL desplegada en Vercel.");
+    else alert(data?.error || "Error actualizando rol.");
   } else {
     showToast("Rol actualizado.");
   }
@@ -910,7 +917,7 @@ async function updateMovementsPermissionsAdmin(userId, canRead, canWrite) {
     return;
   }
 
-  const resp = await fetch("/api/admin/update-module-permissions", {
+  const resp = await fetch(`${API_BASE}/api/admin/update-module-permissions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -926,7 +933,8 @@ async function updateMovementsPermissionsAdmin(userId, canRead, canWrite) {
 
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) {
-    alert(data?.error || "Error actualizando permisos.");
+    if (resp.status === 404) alert("La API no está disponible (404). Si estás en local, ejecuta 'vercel dev' o abre la app desde la URL desplegada en Vercel.");
+    else alert(data?.error || "Error actualizando permisos.");
   } else {
     showToast("Permisos actualizados.");
   }
@@ -943,7 +951,7 @@ async function createUserFromAdminPanel() {
   const token = await getAccessTokenForAdminApi();
   if (!token) return alert("No hay sesión activa.");
 
-  const resp = await fetch("/api/admin/create-user", {
+  const resp = await fetch(`${API_BASE}/api/admin/create-user`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -953,7 +961,8 @@ async function createUserFromAdminPanel() {
   });
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) {
-    alert(data?.error || "Error al crear usuario.");
+    if (resp.status === 404) alert("La API no está disponible (404). Si estás en local, ejecuta 'vercel dev' o abre la app desde la URL desplegada en Vercel.");
+    else alert(data?.error || "Error al crear usuario.");
     return;
   }
 
@@ -981,6 +990,8 @@ function showAppContent() {
   const app = document.getElementById("app-content");
   if (login) login.classList.add("hidden");
   if (app) app.classList.remove("hidden");
+  hideAdminPanel();
+  hideDeletedPanel();
   const btnLogout = document.getElementById("btn-logout");
   if (btnLogout) btnLogout.style.display = "";
   if (typeof syncMenuVisibility === "function") syncMenuVisibility();
@@ -1130,6 +1141,7 @@ async function doLogin() {
   if (btnEntrar) btnEntrar.disabled = true;
   if (btnCrear) btnCrear.disabled = true;
   await loadCurrentUserRole();
+  if (state.currentRole !== "super") hideAdminPanel();
   await initAppContent();
   if (btnEntrar) btnEntrar.disabled = false;
   if (btnCrear) btnCrear.disabled = false;
@@ -1191,6 +1203,7 @@ async function doSignUp() {
   if (btnEntrar) btnEntrar.disabled = true;
   if (btnCrear) btnCrear.disabled = true;
   await loadCurrentUserRole();
+  if (state.currentRole !== "super") hideAdminPanel();
   await initAppContent();
   if (btnEntrar) btnEntrar.disabled = false;
   if (btnCrear) btnCrear.disabled = false;
@@ -1311,6 +1324,8 @@ async function doUpdatePassword() {
   showAppContent();
   const btnGuardar = document.getElementById("btn-guardar-password");
   if (btnGuardar) btnGuardar.disabled = true;
+  await loadCurrentUserRole();
+  if (state.currentRole !== "super") hideAdminPanel();
   await initAppContent();
   if (btnGuardar) btnGuardar.disabled = false;
   document.getElementById("btn-logout")?.style.setProperty("display", "");
@@ -1513,6 +1528,7 @@ async function init() {
       }
       await loadCurrentUserRole();
       showAppContent();
+      if (state.currentRole !== "super") hideAdminPanel();
     }
 
     await initAppContent();
