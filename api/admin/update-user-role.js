@@ -1,4 +1,5 @@
 const { applyCors, handleCorsPreflight } = require("../cors");
+const { readJsonBody } = require("../read-json-body");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -16,8 +17,13 @@ async function verifySuper(accessToken) {
     },
   });
   const userData = await userResp.json().catch(() => ({}));
-  const role = userData?.user_metadata?.role;
-  return role === "super" || role === "full";
+  const role =
+    userData?.user_metadata?.role ??
+    userData?.app_metadata?.role ??
+    null;
+  if (role === "super" || role === "full") return true;
+  const s = String(role || "").trim().toLowerCase();
+  return s === "super" || s === "full";
 }
 
 module.exports = async (req, res) => {
@@ -36,18 +42,7 @@ module.exports = async (req, res) => {
     const ok = await verifySuper(accessToken);
     if (!ok) return json(res, 403, { error: "Solo super puede modificar roles" });
 
-    const contentType = req.headers["content-type"] || "";
-    const bodyRaw = await new Promise((resolve, reject) => {
-      let data = "";
-      req.on("data", (chunk) => { data += chunk; });
-      req.on("end", () => resolve(data));
-      req.on("error", reject);
-    });
-    let body = {};
-    try {
-      if (contentType.includes("application/json") && bodyRaw) body = JSON.parse(bodyRaw);
-    } catch {}
-
+    const body = await readJsonBody(req);
     const { userId, role } = body || {};
     if (!userId || !role) return json(res, 400, { error: "Faltan userId o role" });
     const allowedRoles = ["super", "admin", "user"];

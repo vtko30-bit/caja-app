@@ -1,4 +1,5 @@
 const { applyCors, handleCorsPreflight } = require("../cors");
+const { readJsonBody } = require("../read-json-body");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -6,26 +7,6 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 function json(res, status, obj) {
   applyCors(res);
   return res.status(status).json(obj);
-}
-
-async function readJsonBody(req) {
-  if (req.body && typeof req.body === "object") return req.body;
-  const contentType = req.headers["content-type"] || "";
-  if (!contentType.includes("application/json")) return {};
-
-  const raw = await new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk) => { data += chunk; });
-    req.on("end", () => resolve(data));
-    req.on("error", reject);
-  });
-
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
 }
 
 module.exports = async (req, res) => {
@@ -56,8 +37,12 @@ module.exports = async (req, res) => {
       },
     });
     const userData = await userResp.json().catch(() => ({}));
-    const currentRole = userData?.user_metadata?.role;
-    if (currentRole !== "super" && currentRole !== "full") {
+    const currentRole =
+      userData?.user_metadata?.role ??
+      userData?.app_metadata?.role ??
+      null;
+    const cr = String(currentRole || "").trim().toLowerCase();
+    if (cr !== "super" && cr !== "full") {
       return json(res, 403, { error: "Solo super puede crear usuarios" });
     }
 

@@ -54,6 +54,21 @@ let state = {
   },
 };
 
+function normalizeAppRole(raw) {
+  if (raw == null || raw === "") return "user";
+  const s = String(raw).trim().toLowerCase();
+  if (s === "super" || s === "full") return "super";
+  if (s === "admin") return "admin";
+  if (s === "viewer") return "user";
+  if (s === "user") return "user";
+  return "user";
+}
+
+function isSuperRole() {
+  const r = String(state.currentRole || "").toLowerCase();
+  return r === "super" || r === "full";
+}
+
 function rowToMovement(row) {
   if (!row) return null;
   const date = row.date;
@@ -175,16 +190,16 @@ function formatShortId(id) {
 function canEditMovement(m) {
   if (!m) return false;
   if (!state.useSupabase) return true;
+  if (isSuperRole()) return true;
   if (!state.movementsPermissions.can_write) return false;
-  if (state.currentRole === "super" || state.currentRole === "full") return true;
   if (!state.currentUserId || !m.created_by) return false;
   return String(m.created_by) === String(state.currentUserId);
 }
 
 function canDeleteMovement() {
   if (!state.useSupabase) return true;
-  if (!state.movementsPermissions.can_write) return false;
-  return state.currentRole === "super" || state.currentRole === "full";
+  if (isSuperRole()) return true;
+  return false;
 }
 
 async function refreshCurrentUserId() {
@@ -491,8 +506,7 @@ function exportExcelFiltered() {
 }
 
 function applyRolePermissions() {
-  const role = state.currentRole || "user";
-  const isSuper = role === "super";
+  const isSuper = isSuperRole();
 
   const perms = state.movementsPermissions || { can_read: true, can_write: false };
   const canReadMovements = isSuper || !!perms.can_read;
@@ -927,14 +941,24 @@ async function getAccessTokenForAdminApi() {
 
 function getUserRoleFromUserObj(u) {
   const rawRole =
-    u?.user_metadata?.role ||
-    u?.raw_user_meta_data?.role ||
-    u?.app_metadata?.role ||
+    u?.user_metadata?.role ??
+    u?.raw_user_meta_data?.role ??
+    u?.app_metadata?.role ??
+    u?.raw_app_meta_data?.role ??
     null;
-  if (rawRole === "super" || rawRole === "admin" || rawRole === "user") return rawRole;
-  if (rawRole === "full") return "super";
-  if (rawRole === "viewer") return "user";
-  return "user";
+  return normalizeAppRole(rawRole);
+}
+
+/** Interpreta booleanos que vienen de la API (evita tratar el string "false" como truthy). */
+function adminPanelPermBool(value, defaultWhenMissing) {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+  if (typeof value === "string") {
+    const l = value.trim().toLowerCase();
+    if (l === "true" || l === "t" || l === "1") return true;
+    if (l === "false" || l === "f" || l === "0") return false;
+  }
+  return defaultWhenMissing;
 }
 
 async function loadAdminUsers() {
@@ -988,8 +1012,10 @@ async function loadAdminUsers() {
       const userId = u?.id || u?.user_id || "";
       const email = u?.email || "";
       const role = getUserRoleFromUserObj(u);
-      const canReadMovements = role === "super" ? true : !!u?.can_read_movements;
-      const canWriteMovements = role === "super" ? true : !!u?.can_write_movements;
+      const cr = u?.can_read_movements;
+      const cw = u?.can_write_movements;
+      const canReadMovements = role === "super" ? true : adminPanelPermBool(cr, true);
+      const canWriteMovements = role === "super" ? true : adminPanelPermBool(cw, false);
 
       const tr = document.createElement("tr");
       tr.appendChild(createCell(email));
@@ -1033,8 +1059,8 @@ async function loadAdminUsers() {
         const uid = select.dataset.userId;
         const roleChanged = nextRole !== (select.dataset.originalRole || "");
         if (roleChanged) await updateUserRoleAdmin(uid, nextRole);
-        await updateMovementsPermissionsAdmin(uid, cbRead.checked, cbWrite.checked);
-        await loadAdminUsers();
+        const permOk = await updateMovementsPermissionsAdmin(uid, cbRead.checked, cbWrite.checked);
+        if (permOk) await loadAdminUsers();
         if (roleChanged) select.dataset.originalRole = nextRole;
       });
       tdActions.appendChild(btnSave);
@@ -1082,11 +1108,11 @@ async function updateUserRoleAdmin(userId, role) {
 }
 
 async function updateMovementsPermissionsAdmin(userId, canRead, canWrite) {
-  if (!userId) return;
+  if (!userId) return false;
   const token = await getAccessTokenForAdminApi();
   if (!token) {
     alert("No hay sesión activa.");
-    return;
+    return false;
   }
 
   const resp = await fetch(`${API_BASE}/api/admin/update-module-permissions`, {
@@ -1107,9 +1133,10 @@ async function updateMovementsPermissionsAdmin(userId, canRead, canWrite) {
   if (!resp.ok) {
     if (resp.status === 404) alert("La API no está disponible (404). Si estás en local, ejecuta 'vercel dev' o abre la app desde la URL desplegada en Vercel.");
     else alert(data?.error || "Error actualizando permisos.");
-  } else {
-    showToast("Permisos actualizados.");
+    return false;
   }
+  showToast("Permisos actualizados.");
+  return true;
 }
 
 async function createUserFromAdminPanel() {
@@ -1215,17 +1242,13 @@ async function loadCurrentUserRole() {
     const token = session?.data?.session?.access_token || session?.access_token || "";
     const payload = decodeJwtPayload(token);
     const rawRoleFromJwt =
-      payload?.user_metadata?.role || payload?.user_metadata?.role || payload?.role || null;
+      payload?.user_metadata?.role ??
+      payload?.app_metadata?.role ??
+      payload?.role ??
+      null;
 
-    if (rawRoleFromJwt) {
-      const mapped =
-        rawRoleFromJwt === "super" || rawRoleFromJwt === "admin" || rawRoleFromJwt === "user"
-          ? rawRoleFromJwt
-          : rawRoleFromJwt === "full"
-            ? "super"
-            : rawRoleFromJwt === "viewer"
-              ? "user"
-              : "user";
+    if (rawRoleFromJwt != null && String(rawRoleFromJwt).trim() !== "") {
+      const mapped = normalizeAppRole(rawRoleFromJwt);
       state.currentRole = mapped;
       return mapped;
     }
@@ -1241,15 +1264,13 @@ async function loadCurrentUserRole() {
     return "user";
   }
 
-  const rawRole = data?.user?.user_metadata?.role || data?.user?.app_metadata?.role || null;
-  const role =
-    rawRole === "super" || rawRole === "admin" || rawRole === "user"
-      ? rawRole
-      : rawRole === "full"
-        ? "super"
-        : rawRole === "viewer"
-          ? "user"
-          : "user";
+  const rawRole =
+    data?.user?.user_metadata?.role ??
+    data?.user?.raw_user_meta_data?.role ??
+    data?.user?.app_metadata?.role ??
+    data?.user?.raw_app_meta_data?.role ??
+    null;
+  const role = normalizeAppRole(rawRole);
   state.currentRole = role;
   return role;
 }
@@ -1260,6 +1281,10 @@ async function loadMyMovementsPermissions() {
     return;
   }
   state.movementsPermissions = { can_read: true, can_write: false };
+  if (isSuperRole()) {
+    state.movementsPermissions = { can_read: true, can_write: true };
+    return;
+  }
   const supabase = getSupabase();
   if (!supabase) return;
   try {
@@ -1524,6 +1549,9 @@ async function initAppContent() {
   syncPortalHomeUi();
   setupEventListeners();
   setupOfflineDetection();
+  if (state.useSupabase && getSupabase()) {
+    await loadCurrentUserRole();
+  }
   await refreshCurrentUserId();
   await loadMyMovementsPermissions();
   initFilterDefaults();

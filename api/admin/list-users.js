@@ -16,8 +16,13 @@ async function verifySuper(accessToken) {
     },
   });
   const userData = await userResp.json().catch(() => ({}));
-  const role = userData?.user_metadata?.role;
-  return role === "super" || role === "full";
+  const role =
+    userData?.user_metadata?.role ??
+    userData?.app_metadata?.role ??
+    null;
+  if (role === "super" || role === "full") return true;
+  const s = String(role || "").trim().toLowerCase();
+  return s === "super" || s === "full";
 }
 
 module.exports = async (req, res) => {
@@ -52,27 +57,39 @@ module.exports = async (req, res) => {
 
     // Permisos por módulo (movements)
     const permsResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/user_module_permissions?module=eq.movements&select=user_id,can_read,can_write&per_page=100&page=1`,
+      `${SUPABASE_URL}/rest/v1/user_module_permissions?module=eq.movements&select=user_id,can_read,can_write`,
       {
         headers: {
           Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
           apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Accept: "application/json",
         },
       },
     );
-    const permsData = await permsResp.json().catch(() => ({}));
-    const perms = Array.isArray(permsData) ? permsData : permsData?.data || permsData?.user_module_permissions || [];
+    const permsRaw = await permsResp.text();
+    let permsData;
+    try {
+      permsData = JSON.parse(permsRaw);
+    } catch {
+      permsData = [];
+    }
+    let perms = [];
+    if (Array.isArray(permsData)) {
+      perms = permsData;
+    } else if (permsData && typeof permsData === "object" && Array.isArray(permsData.data)) {
+      perms = permsData.data;
+    }
     const permsByUserId = {};
     perms.forEach((p) => {
       if (!p?.user_id) return;
-      permsByUserId[p.user_id] = p;
+      permsByUserId[String(p.user_id)] = p;
     });
 
     const usersWithPerms = (users || []).map((u) => {
-      const userId = u?.id || u?.user_id || "";
-      const perm = permsByUserId[userId];
-      const canRead = perm?.can_read ?? true;
-      const canWrite = perm?.can_write ?? false;
+      const userId = String(u?.id || u?.user_id || "");
+      const perm = userId ? permsByUserId[userId] : null;
+      const canRead = perm ? !!perm.can_read : true;
+      const canWrite = perm ? !!perm.can_write : false;
       return { ...u, can_read_movements: canRead, can_write_movements: canWrite };
     });
 
