@@ -6,6 +6,7 @@ const supabaseAnonKey = (typeof window !== "undefined" && window.CAJA_SUPABASE_A
 const useSupabase = !!(supabaseUrl && supabaseAnonKey);
 // Base URL para la API (vacío = mismo origen). En local puedes definir window.CAJA_API_BASE = "https://tu-app.vercel.app"
 const API_BASE = typeof window !== "undefined" && window.CAJA_API_BASE !== undefined ? window.CAJA_API_BASE : "";
+const PORTAL_HOME_URL = typeof window !== "undefined" ? String(window.CAJA_PORTAL_HOME_URL || "").trim() : "";
 let supabaseClient = null;
 function getSupabase() {
   if (!useSupabase || !supabaseUrl || !supabaseAnonKey) return null;
@@ -18,6 +19,14 @@ function getSupabase() {
     console.warn("Supabase no disponible:", e);
   }
   return supabaseClient;
+}
+
+function goToPortalHome() {
+  if (!PORTAL_HOME_URL || !/^https?:\/\//i.test(PORTAL_HOME_URL)) {
+    alert("No hay URL del portal configurada. Define CAJA_PORTAL_HOME_URL en config.js");
+    return;
+  }
+  window.location.href = PORTAL_HOME_URL;
 }
 
 let state = {
@@ -1453,10 +1462,14 @@ function setupEventListeners() {
   if (menuExportExcel) menuExportExcel.addEventListener("click", () => { exportExcel(); closeMenu(); });
   const menuExportExcelFiltered = document.getElementById("menu-export-excel-filtered");
   if (menuExportExcelFiltered) menuExportExcelFiltered.addEventListener("click", () => { exportExcelFiltered(); closeMenu(); });
+  const menuGoPortal = document.getElementById("menu-go-portal");
+  if (menuGoPortal) menuGoPortal.addEventListener("click", () => { goToPortalHome(); closeMenu(); });
   const menuAdminCreateUser = document.getElementById("menu-admin-create-user");
   if (menuAdminCreateUser) menuAdminCreateUser.addEventListener("click", () => { openAdminPanel(); closeMenu(); });
   const btnAdminCreateUserTop = document.getElementById("btn-admin-create-user-top");
   if (btnAdminCreateUserTop) btnAdminCreateUserTop.addEventListener("click", () => { openAdminPanel(); });
+  const btnGoPortal = document.getElementById("btn-go-portal");
+  if (btnGoPortal) btnGoPortal.addEventListener("click", goToPortalHome);
 
   const btnVolverAdmin = document.getElementById("btn-volver-admin");
   if (btnVolverAdmin) btnVolverAdmin.addEventListener("click", hideAdminPanel);
