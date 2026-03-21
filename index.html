@@ -125,7 +125,7 @@
       </header>
 
     <main class="layout">
-      <section class="card card-form">
+      <section class="card card-form card-form-compact">
         <h2>Nuevo movimiento</h2>
         <form id="movement-form">
           <div class="field-inline field-date-local">
@@ -195,7 +195,7 @@
             <textarea
               id="notes"
               name="notes"
-              rows="2"
+              rows="1"
               placeholder="Detalle adicional..."
             ></textarea>
           </div>
@@ -231,32 +231,60 @@
           <h2>Movimientos</h2>
           <div class="table-filters">
             <div class="filters-toggle-row">
-              <input
-                id="filter-text"
-                type="text"
-                placeholder="Filtrar por concepto o local..."
-                class="filter-text-input"
-              />
+              <div class="filter-text-wrap">
+                <span class="filter-search-icon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </span>
+                <input
+                  id="filter-text"
+                  type="text"
+                  placeholder="Filtrar por concepto o local..."
+                  class="filter-text-input"
+                  autocomplete="off"
+                />
+              </div>
               <button type="button" class="btn btn-filters-toggle" id="btn-filters-toggle" aria-expanded="false">
                 <span class="filters-toggle-label">Filtros</span>
                 <svg class="filters-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
             </div>
             <div class="table-filters-detail" id="filters-detail">
-              <select id="filter-type">
-                <option value="todos">Todos</option>
+              <div class="filter-period-inline">
+                <div class="filter-period-group">
+                  <label for="filter-period-mode" class="filter-inline-label">Período</label>
+                  <select id="filter-period-mode" title="Tipo de período">
+                    <option value="diario">Diario</option>
+                    <option value="mensual" selected>Mensual</option>
+                    <option value="anual">Anual</option>
+                    <option value="personalizado">Personalizado</option>
+                  </select>
+                </div>
+                <div id="filter-period-diario-wrap" class="filter-period-field hidden">
+                  <label for="filter-period-diario" class="filter-date-label">Día</label>
+                  <input id="filter-period-diario" type="date" title="Seleccionar día" />
+                </div>
+                <div id="filter-period-mes-wrap" class="filter-period-field">
+                  <label for="filter-period-mes" class="filter-date-label">Mes</label>
+                  <input id="filter-period-mes" type="month" title="Seleccionar mes" />
+                </div>
+                <div id="filter-period-anio-wrap" class="filter-period-field hidden">
+                  <label for="filter-period-anio" class="filter-date-label">Año</label>
+                  <input id="filter-period-anio" type="number" min="2000" max="2100" step="1" title="Año" />
+                </div>
+                <div id="filter-date-personalizado-wrap" class="filter-period-field filter-date-personalizado hidden">
+                  <span class="filter-date-range">
+                    <label for="filter-date-desde" class="filter-date-label">Desde</label>
+                    <input id="filter-date-desde" type="date" title="Fecha desde" />
+                    <label for="filter-date-hasta" class="filter-date-label">Hasta</label>
+                    <input id="filter-date-hasta" type="date" title="Fecha hasta" />
+                  </span>
+                </div>
+              </div>
+              <select id="filter-type" title="Filtrar por tipo de movimiento">
+                <option value="todos">Tipo</option>
                 <option value="ingreso">Solo ingresos</option>
                 <option value="egreso">Solo egresos</option>
               </select>
-              <span class="filter-date-range">
-                <label for="filter-date-desde" class="filter-date-label">Desde</label>
-                <input id="filter-date-desde" type="date" title="Fecha desde" />
-                <label for="filter-date-hasta" class="filter-date-label">Hasta</label>
-                <input id="filter-date-hasta" type="date" title="Fecha hasta" />
-                <button type="button" class="btn btn-filter-clear" id="btn-clear-date-filter" title="Quitar filtro de fechas">
-                  Quitar fechas
-                </button>
-              </span>
             </div>
           </div>
         </div>
@@ -264,6 +292,12 @@
           <table>
             <thead>
               <tr>
+                <th>
+                  <button type="button" class="sort-header" data-sort-col="id">
+                    <span>ID</span>
+                    <span class="sort-arrow">↕</span>
+                  </button>
+                </th>
                 <th>
                   <button type="button" class="sort-header" data-sort-col="date">
                     <span>Fecha</span>
@@ -295,6 +329,12 @@
                   </button>
                 </th>
                 <th>Notas</th>
+                <th>
+                  <button type="button" class="sort-header" data-sort-col="creator">
+                    <span>Creado por</span>
+                    <span class="sort-arrow">↕</span>
+                  </button>
+                </th>
                 <th></th>
               </tr>
             </thead>
@@ -319,6 +359,7 @@
               <th>Tipo</th>
               <th>Monto</th>
               <th>Notas</th>
+              <th>Creado por</th>
               <th>Eliminado el</th>
               <th></th>
             </tr>
@@ -379,6 +420,13 @@
     </section>
 
       <div id="toast" class="toast hidden"></div>
+
+      <div id="center-dialog" class="center-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="center-dialog-message">
+        <div class="center-dialog-box">
+          <p id="center-dialog-message"></p>
+          <button type="button" class="btn primary" id="center-dialog-ok">Aceptar</button>
+        </div>
+      </div>
     </div>
 
     <script>

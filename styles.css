@@ -261,10 +261,6 @@ body {
 }
 
 .btn-filters-toggle {
-  display: none;
-}
-
-.btn-filters-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -286,11 +282,144 @@ body {
 }
 
 .table-filters-detail {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   max-width: 100%;
+}
+
+.table-filters-detail.filters-open {
+  display: flex;
+}
+
+.filter-text-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.filter-text-wrap .filter-text-input {
+  width: 100%;
+  padding-left: 36px;
+  box-sizing: border-box;
+}
+
+.filter-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.filter-period-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  width: 100%;
+}
+
+.filter-period-group {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.filter-inline-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.filter-period-inline .filter-period-field {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.filter-period-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-period-inline .filter-date-range {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-date-personalizado .filter-date-range {
+  width: auto;
+}
+
+.center-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.center-dialog.hidden {
+  display: none !important;
+}
+
+.center-dialog-box {
+  max-width: 380px;
+  width: 100%;
+  padding: 22px 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.95));
+  box-shadow: var(--shadow-soft);
+  text-align: center;
+}
+
+.center-dialog-box p {
+  margin: 0 0 18px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.card-form-compact {
+  padding: 14px 16px 12px;
+}
+
+.card-form-compact h2 {
+  margin-bottom: 8px;
+  font-size: 0.98rem;
+}
+
+.card-form-compact form {
+  gap: 8px;
+}
+
+.card-form-compact .field-inline {
+  gap: 8px;
+}
+
+.card-form-compact textarea {
+  min-height: 2.25rem;
 }
 
 .layout {
@@ -630,24 +759,6 @@ textarea::placeholder {
   max-width: 100%;
 }
 
-.btn-filter-clear {
-  padding: 6px 10px;
-  font-size: 0.76rem;
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.5);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
-}
-
-.btn-filter-clear:hover {
-  color: var(--text);
-  border-color: rgba(148, 163, 184, 0.8);
-  background: rgba(15, 23, 42, 0.8);
-}
-
 .table-wrapper {
   border-radius: 12px;
   border: 1px solid rgba(30, 64, 175, 0.5);
@@ -981,10 +1092,6 @@ body.offline-banner-visible {
   .filter-date-range input[type="date"] {
     width: 100%;
   }
-
-  .btn-filter-clear {
-    width: 100%;
-  }
 }
 
 /* Móviles: filtros siempre en columna y sin salirse */
@@ -1029,11 +1136,6 @@ body.offline-banner-visible {
     box-sizing: border-box;
   }
 
-  .btn-filter-clear {
-    width: 100%;
-    box-sizing: border-box;
-  }
-
   .card {
     padding-left: 14px;
     padding-right: 14px;
@@ -1068,16 +1170,11 @@ body.offline-banner-visible {
   }
 
   .table-filters-detail {
-    display: none;
     flex-direction: column;
     align-items: stretch;
     padding-top: 10px;
     border-top: 1px solid var(--border-subtle);
     margin-top: 4px;
-  }
-
-  .table-filters-detail.filters-open {
-    display: flex;
   }
 
   .btn-filters-toggle .filters-toggle-icon.open {

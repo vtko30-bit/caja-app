@@ -1,7 +1,10 @@
+const { applyCors, handleCorsPreflight } = require("../cors");
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function json(res, status, obj) {
+  applyCors(res);
   return res.status(status).json(obj);
 }
 
@@ -18,6 +21,7 @@ async function verifySuper(accessToken) {
 }
 
 module.exports = async (req, res) => {
+  if (handleCorsPreflight(req, res)) return;
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return json(res, 500, { error: "Faltan variables de entorno en Vercel." });

@@ -29,6 +29,15 @@ function goToPortalHome() {
   window.location.href = PORTAL_HOME_URL;
 }
 
+/** Oculta boton/menu del portal si no hay URL (instancias independientes, ej. Zuni). */
+function syncPortalHomeUi() {
+  const enabled = !!(PORTAL_HOME_URL && /^https?:\/\//i.test(PORTAL_HOME_URL));
+  const btn = document.getElementById("btn-go-portal");
+  const menu = document.getElementById("menu-go-portal");
+  if (btn) btn.style.display = enabled ? "" : "none";
+  if (menu) menu.style.display = enabled ? "" : "none";
+}
+
 let state = {
   movements: [],
   editingId: null,
@@ -38,6 +47,7 @@ let state = {
   sortBy: "date",
   sortDir: "asc",
   currentRole: "user",
+  currentUserId: null,
   movementsPermissions: {
     can_read: true,
     can_write: false,
@@ -56,6 +66,8 @@ function rowToMovement(row) {
     type: row.type === "egreso" ? "egreso" : "ingreso",
     amount: Number(row.amount) || 0,
     notes: row.notes || "",
+    created_by: row.created_by || null,
+    creator_email: row.creator_email || "",
   };
 }
 
@@ -64,7 +76,7 @@ async function loadMovementsFromSupabase() {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("movements")
-    .select("id, date, local, concept, type, amount, notes")
+    .select("id, date, local, concept, type, amount, notes, created_by, creator_email")
     .is("deleted_at", null)
     .order("date", { ascending: true });
   if (error) {
@@ -142,6 +154,109 @@ function showToast(message) {
   }, 2200);
 }
 
+function showCenterDialog(message) {
+  const wrap = document.getElementById("center-dialog");
+  const text = document.getElementById("center-dialog-message");
+  if (!wrap || !text) {
+    if (typeof alert !== "undefined") alert(message);
+    return;
+  }
+  text.textContent = message;
+  wrap.classList.remove("hidden");
+}
+
+function formatShortId(id) {
+  if (!id) return "—";
+  const s = String(id);
+  if (s.length <= 10) return s;
+  return `${s.slice(0, 8)}…`;
+}
+
+function canEditMovement(m) {
+  if (!m) return false;
+  if (!state.useSupabase) return true;
+  if (!state.movementsPermissions.can_write) return false;
+  if (state.currentRole === "super" || state.currentRole === "full") return true;
+  if (!state.currentUserId || !m.created_by) return false;
+  return String(m.created_by) === String(state.currentUserId);
+}
+
+function canDeleteMovement() {
+  if (!state.useSupabase) return true;
+  if (!state.movementsPermissions.can_write) return false;
+  return state.currentRole === "super" || state.currentRole === "full";
+}
+
+async function refreshCurrentUserId() {
+  state.currentUserId = null;
+  if (!state.useSupabase) return;
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  state.currentUserId = user?.id || null;
+}
+
+function getFilterDateBounds() {
+  const mode = document.getElementById("filter-period-mode")?.value || "mensual";
+  const now = new Date();
+  const y = now.getFullYear();
+  if (mode === "diario") {
+    const d = (document.getElementById("filter-period-diario")?.value || "").trim();
+    return { desde: d, hasta: d };
+  }
+  if (mode === "mensual") {
+    const month = (document.getElementById("filter-period-mes")?.value || "").trim();
+    if (!month) return { desde: "", hasta: "" };
+    const parts = month.split("-");
+    const yy = parseInt(parts[0], 10);
+    const mo = parseInt(parts[1], 10);
+    if (isNaN(yy) || isNaN(mo)) return { desde: "", hasta: "" };
+    const lastDay = new Date(yy, mo, 0).getDate();
+    return { desde: `${month}-01`, hasta: `${month}-${String(lastDay).padStart(2, "0")}` };
+  }
+  if (mode === "anual") {
+    const yearStr = (document.getElementById("filter-period-anio")?.value || "").trim();
+    const yy = yearStr ? parseInt(yearStr, 10) : y;
+    if (isNaN(yy)) return { desde: "", hasta: "" };
+    return { desde: `${yy}-01-01`, hasta: `${yy}-12-31` };
+  }
+  if (mode === "personalizado") {
+    return {
+      desde: (document.getElementById("filter-date-desde")?.value || "").trim(),
+      hasta: (document.getElementById("filter-date-hasta")?.value || "").trim(),
+    };
+  }
+  return { desde: "", hasta: "" };
+}
+
+function initFilterDefaults() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const modeEl = document.getElementById("filter-period-mode");
+  const mes = document.getElementById("filter-period-mes");
+  const diario = document.getElementById("filter-period-diario");
+  const anio = document.getElementById("filter-period-anio");
+  if (modeEl) modeEl.value = "mensual";
+  if (mes) mes.value = `${y}-${m}`;
+  if (diario) diario.value = now.toISOString().slice(0, 10);
+  if (anio) anio.value = String(y);
+}
+
+function syncFilterPeriodControls() {
+  const mode = document.getElementById("filter-period-mode")?.value || "mensual";
+  const map = {
+    "filter-period-diario-wrap": mode === "diario",
+    "filter-period-mes-wrap": mode === "mensual",
+    "filter-period-anio-wrap": mode === "anual",
+    "filter-date-personalizado-wrap": mode === "personalizado",
+  };
+  Object.entries(map).forEach(([id, on]) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle("hidden", !on);
+  });
+}
+
 function setOfflineBanner(offline) {
   const banner = document.getElementById("offline-banner");
   const badge = document.getElementById("badge-mode");
@@ -198,8 +313,7 @@ function updateConceptDatalist() {
 function applyFilters(movements) {
   const text = (document.getElementById("filter-text")?.value || "").trim().toLowerCase();
   const type = document.getElementById("filter-type")?.value || "todos";
-  const desde = (document.getElementById("filter-date-desde")?.value || "").trim();
-  const hasta = (document.getElementById("filter-date-hasta")?.value || "").trim();
+  const { desde, hasta } = getFilterDateBounds();
   return movements.filter((m) => {
     const matchesType = type === "todos" || m.type === type;
     const combined = (m.concept || "") + " " + (m.local || "") + " " + (m.notes || "");
@@ -220,7 +334,11 @@ function renderTable() {
     const col = state.sortBy || "date";
     const dir = state.sortDir === "desc" ? -1 : 1;
     let res = 0;
-    if (col === "date") {
+    if (col === "id") {
+      res = String(a.id).localeCompare(String(b.id));
+    } else if (col === "creator") {
+      res = (a.creator_email || "").localeCompare(b.creator_email || "", "es", { sensitivity: "base" });
+    } else if (col === "date") {
       res = (a.date || "").localeCompare(b.date || "");
     } else if (col === "local") {
       res = (a.local || "").localeCompare(b.local || "", "es", { sensitivity: "base" });
@@ -243,6 +361,7 @@ function renderTable() {
   });
   sorted.forEach((m) => {
     const tr = document.createElement("tr");
+    tr.appendChild(createCell(formatShortId(m.id)));
     tr.appendChild(createCell(m.date || ""));
     tr.appendChild(createCell(m.local || ""));
     tr.appendChild(createCell(m.concept || ""));
@@ -257,6 +376,7 @@ function renderTable() {
     tdAmount.textContent = formatCurrency(m.amount);
     tr.appendChild(tdAmount);
     tr.appendChild(createCell(m.notes || ""));
+    tr.appendChild(createCell(m.creator_email || "—"));
     const tdActions = document.createElement("td");
     const actions = document.createElement("div");
     actions.className = "row-actions";
@@ -282,7 +402,7 @@ function renderTable() {
 }
 
 function movementsToCSV(movements) {
-  const headers = ["Fecha", "Local", "Concepto", "Tipo", "Monto", "Notas"];
+  const headers = ["Id", "Fecha", "Local", "Concepto", "Tipo", "Monto", "Notas", "Creado por"];
   const escape = (value) => {
     const str = (value ?? "").toString().replace(/\r?\n/g, " ");
     const needsQuotes = /[",;]/.test(str);
@@ -290,12 +410,14 @@ function movementsToCSV(movements) {
     return needsQuotes ? `"${escaped}"` : escaped;
   };
   const rows = movements.map((m) => [
+    m.id || "",
     m.date || "",
     m.local || "",
     m.concept || "",
     m.type === "egreso" ? "Egreso" : "Ingreso",
     typeof m.amount === "number" ? String(m.amount).replace(".", ",") : "",
     m.notes || "",
+    m.creator_email || "",
   ]);
   const lines = [headers, ...rows].map((cols) => cols.map(escape).join(";"));
   return lines.join("\r\n");
@@ -377,7 +499,6 @@ function applyRolePermissions() {
   const canWriteMovements = isSuper || !!perms.can_write;
 
   const canImport = canWriteMovements;
-  const canDelete = canWriteMovements;
   const canViewDeleted = canReadMovements;
 
   const form = document.getElementById("movement-form");
@@ -394,7 +515,7 @@ function applyRolePermissions() {
   }
 
   document.querySelectorAll(".edit-btn").forEach((btn) => { btn.disabled = !canWriteMovements; });
-  document.querySelectorAll(".delete-btn").forEach((btn) => { btn.disabled = !canDelete; });
+  document.querySelectorAll(".delete-btn").forEach((btn) => { btn.disabled = !canWriteMovements; });
 
   const fileImport = document.getElementById("file-import");
   if (fileImport) fileImport.disabled = !canImport;
@@ -488,6 +609,10 @@ function resetForm() {
 function startEdit(id) {
   const movement = state.movements.find((m) => m.id === id);
   if (!movement) return;
+  if (!canEditMovement(movement)) {
+    showCenterDialog("No puede editar este movimiento.");
+    return;
+  }
   const form = document.getElementById("movement-form");
   if (!form) return;
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
@@ -503,6 +628,10 @@ function startEdit(id) {
 }
 
 function deleteMovement(id) {
+  if (!canDeleteMovement()) {
+    showCenterDialog("No está autorizado a eliminar.");
+    return;
+  }
   if (!confirm("¿Eliminar este movimiento? Quedará en el registro de eliminados.")) return;
   // Diferir el trabajo pesado para no bloquear INP (respuesta al clic)
   setTimeout(async () => {
@@ -553,6 +682,11 @@ async function handleSubmit(event) {
   const supabase = getSupabase();
   if (state.useSupabase && supabase && navigator.onLine) {
     if (state.editingId) {
+      const existing = state.movements.find((x) => x.id === state.editingId);
+      if (existing && !canEditMovement(existing)) {
+        showCenterDialog("No puede editar este movimiento.");
+        return;
+      }
       const { error } = await supabase.from("movements").update(payload).eq("id", state.editingId);
       if (error) {
         showToast("Error al actualizar: " + (error.message || "revisa la conexión."));
@@ -560,13 +694,25 @@ async function handleSubmit(event) {
       }
       showToast("Movimiento actualizado.");
     } else {
-      const { data, error } = await supabase.from("movements").insert(payload).select("id").single();
+      const { data, error } = await supabase
+        .from("movements")
+        .insert(payload)
+        .select("id, creator_email, created_by")
+        .single();
       if (error) {
         showToast("Error al guardar: " + (error.message || "revisa la conexión."));
         return;
       }
       showToast("Movimiento agregado.");
-      state.movements = [...state.movements, { id: data.id, ...payload }];
+      state.movements = [
+        ...state.movements,
+        {
+          id: data.id,
+          ...payload,
+          creator_email: data.creator_email || "",
+          created_by: data.created_by || null,
+        },
+      ];
       renderTable();
       resetForm();
       requestAnimationFrame(() => {
@@ -589,13 +735,18 @@ async function handleSubmit(event) {
   }
 
   if (state.editingId) {
+    const existing = state.movements.find((x) => x.id === state.editingId);
+    if (existing && !canEditMovement(existing)) {
+      showCenterDialog("No puede editar este movimiento.");
+      return;
+    }
     state.movements = state.movements.map((m) =>
       m.id === state.editingId ? { ...m, ...payload } : m
     );
     showToast("Movimiento actualizado.");
   } else {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    state.movements.push({ id, ...payload });
+    state.movements.push({ id, ...payload, created_by: null, creator_email: "" });
     showToast("Movimiento agregado.");
   }
   saveMovementsLocal(state.movements);
@@ -640,6 +791,8 @@ async function importJSONFromFile(file) {
         amount: Number(item.amount) || 0,
         local: item.local || "",
         notes: item.notes || "",
+        created_by: item.created_by || null,
+        creator_email: item.creator_email || "",
       }));
     const supabaseImport = getSupabase();
     if (state.useSupabase && supabaseImport && navigator.onLine) {
@@ -666,7 +819,7 @@ async function loadDeletedMovements() {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("movements")
-    .select("id, date, local, concept, type, amount, notes, deleted_at")
+    .select("id, date, local, concept, type, amount, notes, deleted_at, creator_email, created_by")
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false });
   if (error) return [];
@@ -696,6 +849,7 @@ function renderDeletedPanel(list) {
     tdAmount.textContent = formatCurrency(m.amount);
     tr.appendChild(tdAmount);
     tr.appendChild(createCell(m.notes || ""));
+    tr.appendChild(createCell(m.creator_email || "—"));
     tr.appendChild(createCell(formatDateTime(m.deleted_at)));
     const tdRestore = document.createElement("td");
     const btnRestore = document.createElement("button");
@@ -890,6 +1044,15 @@ async function loadAdminUsers() {
     });
   } catch (e) {
     console.error(e);
+    tbody.innerHTML = "";
+    const errRow = document.createElement("tr");
+    const errTd = document.createElement("td");
+    errTd.colSpan = 5;
+    errTd.textContent =
+      "No se pudo cargar la lista (revisa la consola). En local suele faltar la API: ejecuta «vercel dev» en esta carpeta o despliega y usa la URL de Vercel en CAJA_API_BASE.";
+    errTd.style.color = "var(--danger, #f87171)";
+    errRow.appendChild(errTd);
+    tbody.appendChild(errRow);
     alert("Error listando usuarios.");
   }
 }
@@ -1004,6 +1167,7 @@ function showAppContent() {
   const btnLogout = document.getElementById("btn-logout");
   if (btnLogout) btnLogout.style.display = "";
   if (typeof syncMenuVisibility === "function") syncMenuVisibility();
+  syncPortalHomeUi();
 }
 
 function setLoginMessage(msg, isSuccess) {
@@ -1091,9 +1255,11 @@ async function loadCurrentUserRole() {
 }
 
 async function loadMyMovementsPermissions() {
-  // Defaults para evitar quedar bloqueado en caso de error.
+  if (!state.useSupabase) {
+    state.movementsPermissions = { can_read: true, can_write: true };
+    return;
+  }
   state.movementsPermissions = { can_read: true, can_write: false };
-  if (!state.useSupabase) return;
   const supabase = getSupabase();
   if (!supabase) return;
   try {
@@ -1355,9 +1521,13 @@ async function initAppContent() {
   const btnVerEliminados = document.getElementById("btn-ver-eliminados");
   if (btnVerEliminados) btnVerEliminados.style.display = state.useSupabase ? "" : "none";
   syncMenuVisibility();
+  syncPortalHomeUi();
   setupEventListeners();
   setupOfflineDetection();
+  await refreshCurrentUserId();
   await loadMyMovementsPermissions();
+  initFilterDefaults();
+  syncFilterPeriodControls();
   state.movements = await loadMovements();
   renderTable();
   applyRolePermissions();
@@ -1408,10 +1578,27 @@ function setupEventListeners() {
     if (file) { importJSONFromFile(file); e.target.value = ""; }
   });
 
-  ["filter-text", "filter-type", "filter-date-desde", "filter-date-hasta"].forEach((id) => {
+  ["filter-text", "filter-type", "filter-period-diario", "filter-period-mes", "filter-date-desde", "filter-date-hasta"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener(id === "filter-text" ? "input" : "change", renderTable);
   });
+  const filterAnio = document.getElementById("filter-period-anio");
+  if (filterAnio) filterAnio.addEventListener("input", renderTable);
+  const periodMode = document.getElementById("filter-period-mode");
+  if (periodMode) {
+    periodMode.addEventListener("change", () => {
+      syncFilterPeriodControls();
+      renderTable();
+    });
+  }
+  const centerDlg = document.getElementById("center-dialog");
+  const centerOk = document.getElementById("center-dialog-ok");
+  if (centerOk && centerDlg) {
+    centerOk.addEventListener("click", () => centerDlg.classList.add("hidden"));
+    centerDlg.addEventListener("click", (e) => {
+      if (e.target === centerDlg) centerDlg.classList.add("hidden");
+    });
+  }
 
   const sortHeaders = document.querySelectorAll(".sort-header");
   sortHeaders.forEach((el) => {
@@ -1420,15 +1607,6 @@ function setupEventListeners() {
       setSort(col);
     });
   });
-  const btnClearDate = document.getElementById("btn-clear-date-filter");
-  if (btnClearDate) btnClearDate.addEventListener("click", () => {
-    const desde = document.getElementById("filter-date-desde");
-    const hasta = document.getElementById("filter-date-hasta");
-    if (desde) desde.value = "";
-    if (hasta) hasta.value = "";
-    renderTable();
-  });
-
   const btnVerEliminados = document.getElementById("btn-ver-eliminados");
   if (btnVerEliminados) btnVerEliminados.addEventListener("click", openDeletedPanel);
   const btnVolver = document.getElementById("btn-volver-movimientos");

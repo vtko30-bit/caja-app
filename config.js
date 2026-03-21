@@ -2,5 +2,28 @@
 // Pega entre las comillas: 1) Tu Project URL  2) Tu anon public key (Supabase → Settings → API).
 window.CAJA_SUPABASE_URL = "https://lpmpczarkjvnwjhwghqg.supabase.co";
 window.CAJA_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwbXBjemFya2p2bndqaHdnaHFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5OTkzMzIsImV4cCI6MjA4NjU3NTMzMn0.wVO0qIhvnk1i64MDBFrlur48QSsqL253g4ImgXAltGQ";
-// URL del portal (Rg). Deja vacio si no usas portal.
-window.CAJA_PORTAL_HOME_URL = "https://caja-app-recetas.vercel.app/";
+// URL del portal (solo si esta Caja se abre desde otro sitio). Instancias aparte: dejar "".
+window.CAJA_PORTAL_HOME_URL = "https://caja-app.vercel.app/";
+
+// API admin: con «vercel dev» las rutas /api son el mismo origen (dejar ""). Con Live Server / archivo local no hay /api: apuntar al deploy.
+// Si defines window.CAJA_API_BASE antes de cargar config.js, no se sobrescribe.
+(function () {
+  if (typeof window === "undefined" || typeof window.CAJA_API_BASE !== "undefined") return;
+  var loc = window.location || {};
+  var proto = loc.protocol || "";
+  var host = loc.hostname || "";
+  var port = String(loc.port || "");
+  var isFile = proto === "file:";
+  var isLocalHost =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "[::1]";
+  // vercel dev suele usar 3000; mismo origen tiene /api
+  var isLikelyVercelDev = isLocalHost && (port === "3000" || port === "3001");
+  if (isLikelyVercelDev) {
+    window.CAJA_API_BASE = "";
+    return;
+  }
+  var needsRemoteApi = isFile || isLocalHost;
+  window.CAJA_API_BASE = needsRemoteApi ? "https://caja-app.vercel.app" : "";
+})();

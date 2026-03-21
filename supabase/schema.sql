@@ -9,10 +9,32 @@ CREATE TABLE IF NOT EXISTS public.movements (
   type TEXT NOT NULL CHECK (type IN ('ingreso', 'egreso')),
   amount NUMERIC(12,2) NOT NULL,
   notes TEXT DEFAULT '',
+  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  creator_email TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
   deleted_at TIMESTAMPTZ
 );
+
+-- Al insertar, registrar siempre el usuario autenticado y su email (auditoría).
+CREATE OR REPLACE FUNCTION public.movements_set_creator()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  NEW.created_by := auth.uid();
+  SELECT email INTO NEW.creator_email FROM auth.users WHERE id = auth.uid();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tr_movements_set_creator ON public.movements;
+CREATE TRIGGER tr_movements_set_creator
+  BEFORE INSERT ON public.movements
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.movements_set_creator();
 
 -- Índices para filtros y listado
 CREATE INDEX IF NOT EXISTS idx_movements_deleted_at ON public.movements (deleted_at);

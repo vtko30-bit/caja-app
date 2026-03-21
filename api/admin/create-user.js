@@ -1,7 +1,10 @@
+const { applyCors, handleCorsPreflight } = require("../cors");
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function json(res, status, obj) {
+  applyCors(res);
   return res.status(status).json(obj);
 }
 
@@ -26,6 +29,7 @@ async function readJsonBody(req) {
 }
 
 module.exports = async (req, res) => {
+  if (handleCorsPreflight(req, res)) return;
   try {
     if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
