@@ -94,3 +94,7 @@ WHERE NOT EXISTS (
   WHERE p.user_id = u.id
     AND p.module = 'movements'
 );
+
+-- Cuadraturas de caja (snapshots JSON). Crear tabla y políticas con:
+-- supabase/migration-cuadratura-snapshots.sql
+

@@ -223,20 +223,19 @@
         </div>
         <div class="summary-grid">
           <div>
-            <span class="summary-label">Ingresos</span>
-            <span id="sum-ingresos" class="summary-value positive">$ 0,00</span>
+            <span class="summary-label" id="summary-label-col1">Saldo inicial</span>
+            <span id="sum-ingresos" class="summary-value saldo">$ 0,00</span>
           </div>
           <div>
-            <span class="summary-label">Egresos</span>
+            <span class="summary-label" id="summary-label-col2">Egresos del período</span>
             <span id="sum-egresos" class="summary-value negative">$ 0,00</span>
           </div>
           <div>
-            <span class="summary-label">Saldo</span>
+            <span class="summary-label" id="summary-label-col3">Saldo</span>
             <span id="sum-saldo" class="summary-value saldo">$ 0,00</span>
           </div>
         </div>
         <div id="panel-cuadratura" class="cuadratura-panel hidden" role="region" aria-labelledby="btn-cuadratura-toggle">
-          <p class="cuadratura-intro">Indicá cuántas unidades tenés de cada billete. El total se compara con el <strong>Saldo</strong> del resumen (ingresos − egresos de los movimientos cargados).</p>
           <div class="cuadratura-grid">
             <div class="cuadratura-row cuadratura-row-head">
               <span>Valor</span>
@@ -274,7 +273,36 @@
             <div><span class="cuadratura-total-label">Saldo (resumen)</span> <strong id="cuad-saldo-ref">$ 0</strong></div>
           </div>
           <p id="cuad-comparacion" class="cuadratura-msg" aria-live="polite"></p>
-          <button type="button" class="btn ghost btn-cuadratura-clear" id="btn-cuadratura-clear">Limpiar conteos</button>
+          <div class="cuadratura-actions">
+            <button type="button" class="btn ghost btn-cuadratura-clear" id="btn-cuadratura-clear">Limpiar</button>
+            <button type="button" class="btn secondary" id="btn-cuadratura-guardar">Guardar</button>
+            <button type="button" class="btn ghost" id="btn-cuadratura-salir">Salir</button>
+          </div>
+          <p id="cuad-save-feedback" class="cuadratura-save-feedback hidden" role="status" aria-live="polite"></p>
+          <div class="cuadratura-historial">
+            <div class="cuadratura-historial-head">
+              <h3 class="cuadratura-historial-title">Historial (este dispositivo)</h3>
+              <div class="cuadratura-historial-actions">
+                <button type="button" class="btn ghost" id="btn-cuadratura-export-json">Exportar JSON</button>
+                <button type="button" class="btn ghost" id="btn-cuadratura-import-json">Importar JSON</button>
+                <input type="file" id="file-cuadratura-import" class="hidden" accept=".json,application/json" />
+                <button type="button" class="btn secondary" id="btn-cuadratura-upload-all">Subir a Supabase</button>
+              </div>
+            </div>
+            <p id="cuad-historial-vacio" class="cuadratura-historial-empty hidden">No hay cuadraturas guardadas.</p>
+            <ul id="cuad-historial-list" class="cuadratura-historial-list" aria-label="Cuadraturas guardadas"></ul>
+            <p id="cuad-historial-msg" class="cuadratura-historial-msg hidden" role="status" aria-live="polite"></p>
+            <div class="cuadratura-historial-cloud" id="cuadratura-historial-cloud-wrap">
+              <div class="cuadratura-historial-head">
+                <h3 class="cuadratura-historial-title">En Supabase</h3>
+                <button type="button" class="btn ghost" id="btn-cuadratura-refresh-cloud">Actualizar lista</button>
+              </div>
+              <p id="cuad-historial-cloud-loading" class="cuadratura-historial-empty hidden">Cargando…</p>
+              <p id="cuad-historial-cloud-vacio" class="cuadratura-historial-empty hidden">No hay cuadraturas en el servidor o no tenés permiso de lectura.</p>
+              <ul id="cuad-historial-cloud-list" class="cuadratura-historial-list" aria-label="Cuadraturas en Supabase"></ul>
+              <p id="cuad-historial-cloud-msg" class="cuadratura-historial-msg hidden" role="status" aria-live="polite"></p>
+            </div>
+          </div>
         </div>
       </section>
 

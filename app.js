@@ -1,5 +1,9 @@
 // Caja - Movimientos (local y/o online con Supabase)
 const STORAGE_KEY = "caja_movimientos_v1";
+const STORAGE_KEY_CUADRATURA = "caja_cuadratura_copias_v1";
+
+let cuadraturaSaveFeedbackTimer = null;
+let cuadraturaCloudLoadToken = 0;
 
 const supabaseUrl = (typeof window !== "undefined" && window.CAJA_SUPABASE_URL) || "";
 const supabaseAnonKey = (typeof window !== "undefined" && window.CAJA_SUPABASE_ANON_KEY) || "";
@@ -287,24 +291,72 @@ function setOfflineBanner(offline) {
 
 const CUADRADURA_DENOMS = [100, 1000, 5000, 10000, 20000];
 
+/** Saldo neto (ingresos − egresos) de una lista de movimientos. */
+function netBalanceFromMovements(movements) {
+  return movements.reduce((acc, m) => {
+    const amt = Number(m.amount) || 0;
+    return acc + (m.type === "egreso" ? -amt : amt);
+  }, 0);
+}
+
+/**
+ * Resumen alineado al período del filtro (desde getFilterDateBounds):
+ * - Con fecha "desde": saldo inicial = movimientos con fecha estrictamente anterior a "desde" (todo el libro);
+ *   egresos = suma de egresos en el período que cumplen el resto de filtros (como la tabla);
+ *   saldo = inicial + ingresos del período filtrados − egresos del período filtrados.
+ * - Sin "desde": totales clásicos solo sobre movimientos que pasan applyFilters.
+ */
 function getSummaryTotals() {
-  const ingresos = state.movements
-    .filter((m) => m.type === "ingreso")
-    .reduce((acc, m) => acc + (m.amount || 0), 0);
-  const egresos = state.movements
-    .filter((m) => m.type === "egreso")
-    .reduce((acc, m) => acc + (m.amount || 0), 0);
-  return { ingresos, egresos, saldo: ingresos - egresos };
+  const { desde } = getFilterDateBounds();
+  const filtered = applyFilters(state.movements);
+
+  if (!desde) {
+    const ingresos = filtered.filter((m) => m.type === "ingreso").reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+    const egresos = filtered.filter((m) => m.type === "egreso").reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+    return { saldoInicial: ingresos, egresosDelPeriodo: egresos, saldo: ingresos - egresos, resumenPorPeriodo: false };
+  }
+
+  const antes = state.movements.filter((m) => {
+    const date = (m.date || "").trim();
+    if (!date) return false;
+    return date < desde;
+  });
+  const saldoInicial = netBalanceFromMovements(antes);
+  const ingresosPeriodo = filtered.filter((m) => m.type === "ingreso").reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+  const egresosDelPeriodo = filtered.filter((m) => m.type === "egreso").reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+  const saldo = saldoInicial + ingresosPeriodo - egresosDelPeriodo;
+  return { saldoInicial, egresosDelPeriodo, saldo, resumenPorPeriodo: true };
+}
+
+function summaryValueClassForSignedAmount(value) {
+  if (value > 0) return "summary-value positive";
+  if (value < 0) return "summary-value negative";
+  return "summary-value saldo";
 }
 
 function recalcSummary() {
-  const { ingresos, egresos, saldo } = getSummaryTotals();
+  const { saldoInicial, egresosDelPeriodo, saldo, resumenPorPeriodo } = getSummaryTotals();
+  const lbl1 = document.getElementById("summary-label-col1");
+  if (lbl1) lbl1.textContent = resumenPorPeriodo ? "Saldo inicial" : "Ingresos";
+  const lbl2 = document.getElementById("summary-label-col2");
+  if (lbl2) lbl2.textContent = resumenPorPeriodo ? "Egresos del período" : "Egresos";
+  const lbl3 = document.getElementById("summary-label-col3");
+  if (lbl3) lbl3.textContent = resumenPorPeriodo ? "Saldo al cierre" : "Saldo";
   const si = document.getElementById("sum-ingresos");
   const se = document.getElementById("sum-egresos");
   const ss = document.getElementById("sum-saldo");
-  if (si) si.textContent = formatCurrency(ingresos);
-  if (se) se.textContent = formatCurrency(egresos);
-  if (ss) ss.textContent = formatCurrency(saldo);
+  if (si) {
+    si.textContent = formatCurrency(saldoInicial);
+    si.className = summaryValueClassForSignedAmount(saldoInicial);
+  }
+  if (se) {
+    se.textContent = formatCurrency(egresosDelPeriodo);
+    se.className = "summary-value negative";
+  }
+  if (ss) {
+    ss.textContent = formatCurrency(saldo);
+    ss.className = summaryValueClassForSignedAmount(saldo);
+  }
   updateCuadraturaCompare();
 }
 
@@ -318,6 +370,370 @@ function getCuadraturaPhysicalTotal() {
     total += qty * d;
   });
   return total;
+}
+
+function getCuadraturaCantidades() {
+  const counts = {};
+  CUADRADURA_DENOMS.forEach((d) => {
+    const el = document.getElementById(`cuad-cant-${d}`);
+    const raw = String(el?.value ?? "").trim();
+    const n = raw === "" ? 0 : parseInt(raw, 10);
+    counts[String(d)] = Number.isFinite(n) && n >= 0 ? n : 0;
+  });
+  return counts;
+}
+
+function getCuadraturaSnapshot() {
+  const { desde, hasta } = getFilterDateBounds();
+  const totals = getSummaryTotals();
+  const physical = getCuadraturaPhysicalTotal();
+  const compareEl = document.getElementById("cuad-comparacion");
+  return {
+    savedAt: new Date().toISOString(),
+    counts: getCuadraturaCantidades(),
+    totalFisico: physical,
+    saldoResumen: totals.saldo,
+    saldoInicial: totals.saldoInicial,
+    egresosDelPeriodo: totals.egresosDelPeriodo,
+    resumenPorPeriodo: totals.resumenPorPeriodo,
+    periodoDesde: desde,
+    periodoHasta: hasta,
+    filtroModoPeriodo: document.getElementById("filter-period-mode")?.value || "",
+    diferenciaFisicoVsSaldo: physical - Math.round(totals.saldo),
+    comparacionTexto: compareEl ? String(compareEl.textContent || "").trim() : "",
+  };
+}
+
+function readCuadraturaSnapshotsFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CUADRATURA);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCuadraturaCopy() {
+  const snap = getCuadraturaSnapshot();
+  const list = readCuadraturaSnapshotsFromStorage();
+  list.push(snap);
+  try {
+    localStorage.setItem(STORAGE_KEY_CUADRATURA, JSON.stringify(list));
+  } catch (e) {
+    console.error(e);
+    alert("No se pudo guardar la copia (almacenamiento lleno o no disponible).");
+    return;
+  }
+  const el = document.getElementById("cuad-save-feedback");
+  if (el) {
+    el.textContent = "Copia guardada en este dispositivo.";
+    el.classList.remove("hidden");
+    if (cuadraturaSaveFeedbackTimer) clearTimeout(cuadraturaSaveFeedbackTimer);
+    cuadraturaSaveFeedbackTimer = setTimeout(() => {
+      el.classList.add("hidden");
+      el.textContent = "";
+      cuadraturaSaveFeedbackTimer = null;
+    }, 2800);
+  }
+  refreshCuadraturaHistorialUi();
+}
+
+function setCuadraturaHistorialMsg(text, isWarn) {
+  const msgEl = document.getElementById("cuad-historial-msg");
+  if (!msgEl) return;
+  msgEl.textContent = text || "";
+  msgEl.classList.toggle("hidden", !text);
+  msgEl.classList.toggle("warn", !!isWarn);
+}
+
+function setCuadraturaCloudMsg(text, isWarn) {
+  const msgEl = document.getElementById("cuad-historial-cloud-msg");
+  if (!msgEl) return;
+  msgEl.textContent = text || "";
+  msgEl.classList.toggle("hidden", !text);
+  msgEl.classList.toggle("warn", !!isWarn);
+}
+
+function isLikelyCuadraturaSnapshot(o) {
+  if (!o || typeof o !== "object") return false;
+  if (typeof o.savedAt !== "string" || !o.savedAt.trim()) return false;
+  if (o.counts && typeof o.counts === "object") return true;
+  if (typeof o.totalFisico === "number") return true;
+  return false;
+}
+
+function mergeCuadraturaSnapshotsFromArray(imported) {
+  if (!Array.isArray(imported)) return { added: 0, skipped: 0, invalid: 0 };
+  const existing = readCuadraturaSnapshotsFromStorage();
+  const bySavedAt = new Set(existing.map((s) => String(s.savedAt || "").trim()).filter(Boolean));
+  let added = 0;
+  let skipped = 0;
+  let invalid = 0;
+  const next = [...existing];
+  for (const raw of imported) {
+    if (!isLikelyCuadraturaSnapshot(raw)) {
+      invalid += 1;
+      continue;
+    }
+    const key = String(raw.savedAt).trim();
+    if (bySavedAt.has(key)) {
+      skipped += 1;
+      continue;
+    }
+    const clone = { ...raw };
+    next.push(clone);
+    bySavedAt.add(key);
+    added += 1;
+  }
+  localStorage.setItem(STORAGE_KEY_CUADRATURA, JSON.stringify(next));
+  return { added, skipped, invalid };
+}
+
+async function handleCuadraturaImportFile(file) {
+  if (!file) return;
+  let text;
+  try {
+    text = await file.text();
+  } catch (e) {
+    console.error(e);
+    setCuadraturaHistorialMsg("No se pudo leer el archivo.", true);
+    return;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    setCuadraturaHistorialMsg("El archivo no es JSON válido.", true);
+    return;
+  }
+  const arr = Array.isArray(parsed)
+    ? parsed
+    : (Array.isArray(parsed?.snapshots) ? parsed.snapshots : (Array.isArray(parsed?.data) ? parsed.data : null));
+  if (!Array.isArray(arr)) {
+    setCuadraturaHistorialMsg("El JSON debe ser un array de cuadraturas (o { \"snapshots\": [...] }).", true);
+    return;
+  }
+  const { added, skipped, invalid } = mergeCuadraturaSnapshotsFromArray(arr);
+  refreshCuadraturaHistorialUi();
+  const parts = [];
+  if (added) parts.push(`${added} importada(s)`);
+  if (skipped) parts.push(`${skipped} omitida(s) (mismo savedAt que una ya guardada)`);
+  if (invalid) parts.push(`${invalid} ignorada(s) (formato inválido)`);
+  const msg = parts.length ? `${parts.join(". ")}.` : "No se importó nada nuevo.";
+  const warn = added === 0 && arr.length > 0;
+  setCuadraturaHistorialMsg(msg, warn);
+}
+
+async function loadCuadraturaCloudHistorial() {
+  const my = ++cuadraturaCloudLoadToken;
+  const wrap = document.getElementById("cuadratura-historial-cloud-wrap");
+  const loading = document.getElementById("cuad-historial-cloud-loading");
+  const empty = document.getElementById("cuad-historial-cloud-vacio");
+  const ul = document.getElementById("cuad-historial-cloud-list");
+  if (!wrap || !ul || !empty) return;
+  if (!state.useSupabase || !getSupabase()) {
+    setCuadraturaCloudMsg("", false);
+    return;
+  }
+  const isSuper = isSuperRole();
+  const perms = state.movementsPermissions || { can_read: true, can_write: false };
+  if (!isSuper && !perms.can_read) {
+    if (loading) loading.classList.add("hidden");
+    ul.innerHTML = "";
+    empty.classList.remove("hidden");
+    empty.textContent = "No tenés permiso para leer cuadraturas en el servidor.";
+    setCuadraturaCloudMsg("", false);
+    return;
+  }
+  empty.textContent = "No hay cuadraturas en el servidor o no tenés permiso de lectura.";
+  const supabase = getSupabase();
+  setCuadraturaCloudMsg("", false);
+  if (loading) loading.classList.remove("hidden");
+  empty.classList.add("hidden");
+  ul.innerHTML = "";
+
+  const { data, error } = await supabase
+    .from("cuadratura_snapshots")
+    .select("id, saved_at, created_at, creator_email, payload")
+    .order("saved_at", { ascending: false })
+    .limit(100);
+
+  if (loading) loading.classList.add("hidden");
+
+  if (my !== cuadraturaCloudLoadToken) return;
+
+  if (error) {
+    console.error(error);
+    setCuadraturaCloudMsg(error.message || "Error al cargar (¿aplicaste migration-cuadratura-snapshots.sql?).", true);
+    empty.classList.remove("hidden");
+    return;
+  }
+
+  if (my !== cuadraturaCloudLoadToken) return;
+
+  const rows = data || [];
+  if (rows.length === 0) {
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+
+  if (my !== cuadraturaCloudLoadToken) return;
+
+  rows.forEach((row) => {
+    const li = document.createElement("li");
+    li.className = "cuadratura-historial-item";
+    const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
+    const dt = row.saved_at ? new Date(row.saved_at) : null;
+    const fecha = dt && !Number.isNaN(dt.getTime())
+      ? dt.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+      : String(row.saved_at || "—");
+    const tf = formatCurrency(payload.totalFisico ?? 0);
+    const email = row.creator_email ? String(row.creator_email) : "";
+    const who = email.includes("@") ? email.split("@")[0] : (email || "—");
+    const main = document.createElement("span");
+    main.textContent = `${fecha} · Total ${tf} · ${who}`;
+    const badge = document.createElement("span");
+    badge.className = "cuadratura-historial-badge ok";
+    badge.textContent = "Servidor";
+    li.appendChild(main);
+    li.appendChild(badge);
+    ul.appendChild(li);
+  });
+}
+
+function refreshCuadraturaHistorialUi() {
+  const list = readCuadraturaSnapshotsFromStorage();
+  const ul = document.getElementById("cuad-historial-list");
+  const empty = document.getElementById("cuad-historial-vacio");
+  const uploadBtn = document.getElementById("btn-cuadratura-upload-all");
+  const exportBtn = document.getElementById("btn-cuadratura-export-json");
+  const importBtn = document.getElementById("btn-cuadratura-import-json");
+  const refreshCloudBtn = document.getElementById("btn-cuadratura-refresh-cloud");
+  const cloudWrap = document.getElementById("cuadratura-historial-cloud-wrap");
+  const isSuper = isSuperRole();
+  const perms = state.movementsPermissions || { can_read: true, can_write: false };
+  const canReadMovements = isSuper || !!perms.can_read;
+  const canWriteMovements = isSuper || !!perms.can_write;
+
+  if (cloudWrap) {
+    cloudWrap.style.display = state.useSupabase ? "" : "none";
+  }
+
+  if (!ul || !empty) return;
+
+  ul.innerHTML = "";
+  const reversed = [...list].reverse();
+  if (reversed.length === 0) {
+    empty.classList.remove("hidden");
+  } else {
+    empty.classList.add("hidden");
+    reversed.forEach((snap) => {
+      const li = document.createElement("li");
+      li.className = "cuadratura-historial-item";
+      const dt = snap.savedAt ? new Date(snap.savedAt) : null;
+      const fecha = dt && !Number.isNaN(dt.getTime())
+        ? dt.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+        : "—";
+      const tf = formatCurrency(snap.totalFisico ?? 0);
+      const main = document.createElement("span");
+      main.textContent = `${fecha} · Total ${tf}`;
+      const badge = document.createElement("span");
+      badge.className = snap.supabaseId ? "cuadratura-historial-badge ok" : "cuadratura-historial-badge pend";
+      badge.textContent = snap.supabaseId ? "En la nube" : "Solo local";
+      li.appendChild(main);
+      li.appendChild(badge);
+      ul.appendChild(li);
+    });
+  }
+
+  if (exportBtn) {
+    exportBtn.disabled = !canReadMovements || list.length === 0;
+  }
+  if (importBtn) {
+    importBtn.disabled = !canWriteMovements;
+  }
+
+  if (uploadBtn) {
+    const pending = list.filter((s) => !s.supabaseId).length;
+    const canCloud = state.useSupabase && !!getSupabase() && canWriteMovements;
+    uploadBtn.style.display = state.useSupabase ? "" : "none";
+    uploadBtn.disabled = !canCloud || pending === 0;
+  }
+
+  if (refreshCloudBtn) {
+    refreshCloudBtn.disabled = !state.useSupabase || !getSupabase() || !canReadMovements;
+  }
+
+  const panelCuad = document.getElementById("panel-cuadratura");
+  if (panelCuad && !panelCuad.classList.contains("hidden") && state.useSupabase && getSupabase() && canReadMovements) {
+    void loadCuadraturaCloudHistorial();
+  }
+}
+
+function exportCuadraturaSnapshotsJSON() {
+  const list = readCuadraturaSnapshotsFromStorage();
+  const blob = new Blob([JSON.stringify(list, null, 2)], { type: "application/json;charset=utf-8" });
+  const a = document.createElement("a");
+  const ts = new Date().toISOString().slice(0, 10);
+  a.href = URL.createObjectURL(blob);
+  a.download = `cuadraturas-${ts}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+  setCuadraturaHistorialMsg("Archivo JSON descargado.", false);
+}
+
+async function uploadPendingCuadraturaSnapshots() {
+  const supabase = getSupabase();
+  setCuadraturaHistorialMsg("", false);
+  if (!state.useSupabase || !supabase) {
+    setCuadraturaHistorialMsg("Subida solo disponible con la app en línea (Supabase).", true);
+    return;
+  }
+  const isSuper = isSuperRole();
+  const perms = state.movementsPermissions || { can_read: true, can_write: false };
+  if (!isSuper && !perms.can_write) {
+    setCuadraturaHistorialMsg("No tenés permiso para subir cuadraturas.", true);
+    return;
+  }
+
+  let list = readCuadraturaSnapshotsFromStorage();
+  const pending = [];
+  list.forEach((s, index) => {
+    if (!s.supabaseId) pending.push({ snap: s, index });
+  });
+  if (pending.length === 0) {
+    setCuadraturaHistorialMsg("No hay cuadraturas pendientes de subir.", false);
+    return;
+  }
+
+  const rows = pending.map(({ snap }) => ({ saved_at: snap.savedAt, payload: snap }));
+  const { data, error } = await supabase.from("cuadratura_snapshots").insert(rows).select("id");
+  if (error) {
+    console.error(error);
+    setCuadraturaHistorialMsg(error.message || "Error al subir a Supabase. ¿Ejecutaste la migración SQL en el proyecto?", true);
+    return;
+  }
+  const ids = data || [];
+  ids.forEach((row, idx) => {
+    const { index } = pending[idx];
+    if (row?.id && list[index]) {
+      list[index] = { ...list[index], supabaseId: row.id };
+    }
+  });
+  try {
+    localStorage.setItem(STORAGE_KEY_CUADRATURA, JSON.stringify(list));
+  } catch (e) {
+    console.error(e);
+    setCuadraturaHistorialMsg("Subida OK pero no se pudo actualizar el historial local.", true);
+    refreshCuadraturaHistorialUi();
+    return;
+  }
+  setCuadraturaHistorialMsg(`Se subieron ${ids.length} cuadratura(s).`, false);
+  refreshCuadraturaHistorialUi();
 }
 
 function updateCuadraturaCompare() {
@@ -369,7 +785,13 @@ function setupCuadraturaListeners() {
   if (btn && panel) {
     btn.addEventListener("click", () => {
       panel.classList.toggle("hidden");
-      btn.setAttribute("aria-expanded", String(!panel.classList.contains("hidden")));
+      const open = !panel.classList.contains("hidden");
+      btn.setAttribute("aria-expanded", String(open));
+      if (open) {
+        setCuadraturaHistorialMsg("", false);
+        setCuadraturaCloudMsg("", false);
+        refreshCuadraturaHistorialUi();
+      }
     });
   }
   CUADRADURA_DENOMS.forEach((d) => {
@@ -385,6 +807,52 @@ function setupCuadraturaListeners() {
       });
       updateCuadraturaCompare();
     });
+  }
+  const btnGuardar = document.getElementById("btn-cuadratura-guardar");
+  if (btnGuardar) btnGuardar.addEventListener("click", saveCuadraturaCopy);
+  const btnSalir = document.getElementById("btn-cuadratura-salir");
+  if (btnSalir && panel && btn) {
+    btnSalir.addEventListener("click", () => {
+      panel.classList.add("hidden");
+      btn.setAttribute("aria-expanded", "false");
+      btn.focus();
+    });
+  }
+  const btnExportJson = document.getElementById("btn-cuadratura-export-json");
+  if (btnExportJson) {
+    btnExportJson.addEventListener("click", () => {
+      const list = readCuadraturaSnapshotsFromStorage();
+      if (!list.length) {
+        setCuadraturaHistorialMsg("No hay datos para exportar.", true);
+        return;
+      }
+      exportCuadraturaSnapshotsJSON();
+    });
+  }
+  const btnUploadAll = document.getElementById("btn-cuadratura-upload-all");
+  if (btnUploadAll) {
+    btnUploadAll.addEventListener("click", async () => {
+      btnUploadAll.disabled = true;
+      try {
+        await uploadPendingCuadraturaSnapshots();
+      } finally {
+        refreshCuadraturaHistorialUi();
+      }
+    });
+  }
+  const btnImportJson = document.getElementById("btn-cuadratura-import-json");
+  const fileCuadImport = document.getElementById("file-cuadratura-import");
+  if (btnImportJson && fileCuadImport) {
+    btnImportJson.addEventListener("click", () => fileCuadImport.click());
+    fileCuadImport.addEventListener("change", (e) => {
+      const f = e.target.files?.[0];
+      if (f) void handleCuadraturaImportFile(f);
+      e.target.value = "";
+    });
+  }
+  const btnRefreshCloud = document.getElementById("btn-cuadratura-refresh-cloud");
+  if (btnRefreshCloud) {
+    btnRefreshCloud.addEventListener("click", () => void loadCuadraturaCloudHistorial());
   }
 }
 
@@ -644,6 +1112,19 @@ function applyRolePermissions() {
   if (menuCreateUser) menuCreateUser.classList.toggle("hidden", !isSuper);
   const btnCreateUserTop = document.getElementById("btn-admin-create-user-top");
   if (btnCreateUserTop) btnCreateUserTop.classList.toggle("hidden", !isSuper);
+
+  const cuadPanel = document.getElementById("panel-cuadratura");
+  if (cuadPanel) {
+    cuadPanel.querySelectorAll('input[type="number"]').forEach((el) => {
+      el.disabled = !canWriteMovements;
+    });
+  }
+  const btnCuadGuardar = document.getElementById("btn-cuadratura-guardar");
+  if (btnCuadGuardar) btnCuadGuardar.disabled = !canWriteMovements;
+  const btnCuadLimpiar = document.getElementById("btn-cuadratura-clear");
+  if (btnCuadLimpiar) btnCuadLimpiar.disabled = !canWriteMovements;
+
+  refreshCuadraturaHistorialUi();
 }
 
 async function createUserViaAdminApi() {
