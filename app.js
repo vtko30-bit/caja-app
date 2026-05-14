@@ -285,20 +285,107 @@ function setOfflineBanner(offline) {
   }
 }
 
-function recalcSummary() {
+const CUADRADURA_DENOMS = [100, 1000, 5000, 10000, 20000];
+
+function getSummaryTotals() {
   const ingresos = state.movements
     .filter((m) => m.type === "ingreso")
     .reduce((acc, m) => acc + (m.amount || 0), 0);
   const egresos = state.movements
     .filter((m) => m.type === "egreso")
     .reduce((acc, m) => acc + (m.amount || 0), 0);
-  const saldo = ingresos - egresos;
+  return { ingresos, egresos, saldo: ingresos - egresos };
+}
+
+function recalcSummary() {
+  const { ingresos, egresos, saldo } = getSummaryTotals();
   const si = document.getElementById("sum-ingresos");
   const se = document.getElementById("sum-egresos");
   const ss = document.getElementById("sum-saldo");
   if (si) si.textContent = formatCurrency(ingresos);
   if (se) se.textContent = formatCurrency(egresos);
   if (ss) ss.textContent = formatCurrency(saldo);
+  updateCuadraturaCompare();
+}
+
+function getCuadraturaPhysicalTotal() {
+  let total = 0;
+  CUADRADURA_DENOMS.forEach((d) => {
+    const el = document.getElementById(`cuad-cant-${d}`);
+    const raw = String(el?.value ?? "").trim();
+    const n = raw === "" ? 0 : parseInt(raw, 10);
+    const qty = Number.isFinite(n) && n >= 0 ? n : 0;
+    total += qty * d;
+  });
+  return total;
+}
+
+function updateCuadraturaCompare() {
+  CUADRADURA_DENOMS.forEach((d) => {
+    const el = document.getElementById(`cuad-cant-${d}`);
+    const subEl = document.getElementById(`cuad-sub-${d}`);
+    const raw = String(el?.value ?? "").trim();
+    const n = raw === "" ? 0 : parseInt(raw, 10);
+    const qty = Number.isFinite(n) && n >= 0 ? n : 0;
+    const sub = qty * d;
+    if (subEl) subEl.textContent = formatCurrency(sub);
+  });
+
+  const saldo = getSummaryTotals().saldo;
+  const physical = getCuadraturaPhysicalTotal();
+  const totalEl = document.getElementById("cuad-total-fisico");
+  const saldoRefEl = document.getElementById("cuad-saldo-ref");
+  const compareEl = document.getElementById("cuad-comparacion");
+  if (totalEl) totalEl.textContent = formatCurrency(physical);
+  if (saldoRefEl) saldoRefEl.textContent = formatCurrency(saldo);
+  if (!compareEl) return;
+
+  const saldoRedondeado = Math.round(saldo);
+  const diff = physical - saldoRedondeado;
+  if (physical === 0 && CUADRADURA_DENOMS.every((d) => {
+    const el = document.getElementById(`cuad-cant-${d}`);
+    const raw = String(el?.value ?? "").trim();
+    return raw === "" || raw === "0";
+  })) {
+    compareEl.textContent = "";
+    compareEl.className = "cuadratura-msg";
+    return;
+  }
+  if (diff === 0) {
+    compareEl.textContent = "Coincide con el saldo del resumen.";
+    compareEl.className = "cuadratura-msg ok";
+  } else if (diff > 0) {
+    compareEl.textContent = `Sobran ${formatCurrency(diff)} respecto al saldo.`;
+    compareEl.className = "cuadratura-msg warn";
+  } else {
+    compareEl.textContent = `Faltan ${formatCurrency(Math.abs(diff))} respecto al saldo.`;
+    compareEl.className = "cuadratura-msg warn";
+  }
+}
+
+function setupCuadraturaListeners() {
+  const btn = document.getElementById("btn-cuadratura-toggle");
+  const panel = document.getElementById("panel-cuadratura");
+  if (btn && panel) {
+    btn.addEventListener("click", () => {
+      panel.classList.toggle("hidden");
+      btn.setAttribute("aria-expanded", String(!panel.classList.contains("hidden")));
+    });
+  }
+  CUADRADURA_DENOMS.forEach((d) => {
+    const el = document.getElementById(`cuad-cant-${d}`);
+    if (el) el.addEventListener("input", updateCuadraturaCompare);
+  });
+  const btnClear = document.getElementById("btn-cuadratura-clear");
+  if (btnClear) {
+    btnClear.addEventListener("click", () => {
+      CUADRADURA_DENOMS.forEach((d) => {
+        const el = document.getElementById(`cuad-cant-${d}`);
+        if (el) el.value = "0";
+      });
+      updateCuadraturaCompare();
+    });
+  }
 }
 
 function updateLocalDatalist() {
@@ -1705,6 +1792,8 @@ function setupEventListeners() {
       if (filtersToggleIcon) filtersToggleIcon.classList.toggle("open", open);
     });
   }
+
+  setupCuadraturaListeners();
 }
 
 function setupRealtime() {

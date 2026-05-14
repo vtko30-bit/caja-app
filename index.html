@@ -209,7 +209,18 @@
       </section>
 
       <section class="card card-summary">
-        <h2>Resumen</h2>
+        <div class="summary-card-head">
+          <h2>Resumen</h2>
+          <button
+            type="button"
+            class="btn secondary btn-cuadratura-toggle"
+            id="btn-cuadratura-toggle"
+            aria-expanded="false"
+            aria-controls="panel-cuadratura"
+          >
+            Cuadratura de caja
+          </button>
+        </div>
         <div class="summary-grid">
           <div>
             <span class="summary-label">Ingresos</span>
@@ -223,6 +234,47 @@
             <span class="summary-label">Saldo</span>
             <span id="sum-saldo" class="summary-value saldo">$ 0,00</span>
           </div>
+        </div>
+        <div id="panel-cuadratura" class="cuadratura-panel hidden" role="region" aria-labelledby="btn-cuadratura-toggle">
+          <p class="cuadratura-intro">Indicá cuántas unidades tenés de cada billete. El total se compara con el <strong>Saldo</strong> del resumen (ingresos − egresos de los movimientos cargados).</p>
+          <div class="cuadratura-grid">
+            <div class="cuadratura-row cuadratura-row-head">
+              <span>Valor</span>
+              <span>Cantidad</span>
+              <span>Subtotal</span>
+            </div>
+            <div class="cuadratura-row">
+              <label for="cuad-cant-100">$ 100</label>
+              <input id="cuad-cant-100" type="number" min="0" step="1" inputmode="numeric" value="0" />
+              <span id="cuad-sub-100" class="cuadratura-sub">$ 0</span>
+            </div>
+            <div class="cuadratura-row">
+              <label for="cuad-cant-1000">$ 1.000</label>
+              <input id="cuad-cant-1000" type="number" min="0" step="1" inputmode="numeric" value="0" />
+              <span id="cuad-sub-1000" class="cuadratura-sub">$ 0</span>
+            </div>
+            <div class="cuadratura-row">
+              <label for="cuad-cant-5000">$ 5.000</label>
+              <input id="cuad-cant-5000" type="number" min="0" step="1" inputmode="numeric" value="0" />
+              <span id="cuad-sub-5000" class="cuadratura-sub">$ 0</span>
+            </div>
+            <div class="cuadratura-row">
+              <label for="cuad-cant-10000">$ 10.000</label>
+              <input id="cuad-cant-10000" type="number" min="0" step="1" inputmode="numeric" value="0" />
+              <span id="cuad-sub-10000" class="cuadratura-sub">$ 0</span>
+            </div>
+            <div class="cuadratura-row">
+              <label for="cuad-cant-20000">$ 20.000</label>
+              <input id="cuad-cant-20000" type="number" min="0" step="1" inputmode="numeric" value="0" />
+              <span id="cuad-sub-20000" class="cuadratura-sub">$ 0</span>
+            </div>
+          </div>
+          <div class="cuadratura-totals">
+            <div><span class="cuadratura-total-label">Total efectivo</span> <strong id="cuad-total-fisico">$ 0</strong></div>
+            <div><span class="cuadratura-total-label">Saldo (resumen)</span> <strong id="cuad-saldo-ref">$ 0</strong></div>
+          </div>
+          <p id="cuad-comparacion" class="cuadratura-msg" aria-live="polite"></p>
+          <button type="button" class="btn ghost btn-cuadratura-clear" id="btn-cuadratura-clear">Limpiar conteos</button>
         </div>
       </section>
 
