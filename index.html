@@ -86,6 +86,7 @@
               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
             </button>
             <div id="topbar-menu-dropdown" class="topbar-menu-dropdown hidden">
+              <button type="button" class="menu-item" id="menu-ver-cuadraturas-guardadas">Cuadraturas guardadas</button>
               <button type="button" class="menu-item" id="menu-ver-eliminados" style="display: none;">Ver eliminados</button>
               <button type="button" class="menu-item" id="menu-export">Exportar JSON</button>
               <button type="button" class="menu-item" id="menu-export-excel">Exportar Excel (todo)</button>
@@ -211,15 +212,20 @@
       <section class="card card-summary">
         <div class="summary-card-head">
           <h2>Resumen</h2>
-          <button
-            type="button"
-            class="btn secondary btn-cuadratura-toggle"
-            id="btn-cuadratura-toggle"
-            aria-expanded="false"
-            aria-controls="panel-cuadratura"
-          >
-            Cuadratura de caja
-          </button>
+          <div class="summary-card-actions">
+            <button type="button" class="btn ghost" id="btn-ver-cuadraturas-guardadas">
+              Ver guardadas
+            </button>
+            <button
+              type="button"
+              class="btn secondary btn-cuadratura-toggle"
+              id="btn-cuadratura-toggle"
+              aria-expanded="false"
+              aria-controls="panel-cuadratura"
+            >
+              Cuadratura de caja
+            </button>
+          </div>
         </div>
         <div class="summary-grid">
           <div>
@@ -239,33 +245,38 @@
           <div class="cuadratura-grid">
             <div class="cuadratura-row cuadratura-row-head">
               <span>Valor</span>
-              <span>Cantidad</span>
-              <span>Subtotal</span>
+              <span>Monto</span>
+              <span>Equiv.</span>
             </div>
             <div class="cuadratura-row">
-              <label for="cuad-cant-100">$ 100</label>
-              <input id="cuad-cant-100" type="number" min="0" step="1" inputmode="numeric" value="0" />
-              <span id="cuad-sub-100" class="cuadratura-sub">$ 0</span>
+              <label for="cuad-monto-100">$ 100</label>
+              <input id="cuad-monto-100" type="number" min="0" step="1" inputmode="numeric" value="0" placeholder="0" title="Total en billetes de $ 100" />
+              <span id="cuad-hint-100" class="cuadratura-hint">—</span>
             </div>
             <div class="cuadratura-row">
-              <label for="cuad-cant-1000">$ 1.000</label>
-              <input id="cuad-cant-1000" type="number" min="0" step="1" inputmode="numeric" value="0" />
-              <span id="cuad-sub-1000" class="cuadratura-sub">$ 0</span>
+              <label for="cuad-monto-500">$ 500</label>
+              <input id="cuad-monto-500" type="number" min="0" step="1" inputmode="numeric" value="0" placeholder="0" title="Total en billetes de $ 500" />
+              <span id="cuad-hint-500" class="cuadratura-hint">—</span>
             </div>
             <div class="cuadratura-row">
-              <label for="cuad-cant-5000">$ 5.000</label>
-              <input id="cuad-cant-5000" type="number" min="0" step="1" inputmode="numeric" value="0" />
-              <span id="cuad-sub-5000" class="cuadratura-sub">$ 0</span>
+              <label for="cuad-monto-1000">$ 1.000</label>
+              <input id="cuad-monto-1000" type="number" min="0" step="1" inputmode="numeric" value="0" placeholder="0" title="Total en billetes de $ 1.000" />
+              <span id="cuad-hint-1000" class="cuadratura-hint">—</span>
             </div>
             <div class="cuadratura-row">
-              <label for="cuad-cant-10000">$ 10.000</label>
-              <input id="cuad-cant-10000" type="number" min="0" step="1" inputmode="numeric" value="0" />
-              <span id="cuad-sub-10000" class="cuadratura-sub">$ 0</span>
+              <label for="cuad-monto-5000">$ 5.000</label>
+              <input id="cuad-monto-5000" type="number" min="0" step="1" inputmode="numeric" value="0" placeholder="0" title="Total en billetes de $ 5.000" />
+              <span id="cuad-hint-5000" class="cuadratura-hint">—</span>
             </div>
             <div class="cuadratura-row">
-              <label for="cuad-cant-20000">$ 20.000</label>
-              <input id="cuad-cant-20000" type="number" min="0" step="1" inputmode="numeric" value="0" />
-              <span id="cuad-sub-20000" class="cuadratura-sub">$ 0</span>
+              <label for="cuad-monto-10000">$ 10.000</label>
+              <input id="cuad-monto-10000" type="number" min="0" step="1" inputmode="numeric" value="0" placeholder="0" title="Total en billetes de $ 10.000" />
+              <span id="cuad-hint-10000" class="cuadratura-hint">—</span>
+            </div>
+            <div class="cuadratura-row">
+              <label for="cuad-monto-20000">$ 20.000</label>
+              <input id="cuad-monto-20000" type="number" min="0" step="1" inputmode="numeric" value="0" placeholder="0" title="Total en billetes de $ 20.000" />
+              <span id="cuad-hint-20000" class="cuadratura-hint">—</span>
             </div>
           </div>
           <div class="cuadratura-totals">
@@ -423,6 +434,54 @@
         </div>
       </section>
     </main>
+
+    <section id="panel-cuadraturas" class="panel-deleted panel-cuadraturas hidden">
+      <div class="panel-deleted-header">
+        <h2>Cuadraturas guardadas</h2>
+        <div class="panel-cuadraturas-tools">
+          <button type="button" class="btn ghost" id="btn-cuadraturas-vista-refresh">Actualizar</button>
+          <button type="button" class="btn secondary" id="btn-cuadraturas-vista-volver">Volver</button>
+        </div>
+      </div>
+      <p id="cuadraturas-vista-msg" class="cuadratura-historial-msg hidden" role="status"></p>
+
+      <h3 class="panel-cuadraturas-subtitle">Este dispositivo</h3>
+      <div id="cuadraturas-local-table-wrap" class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Total efectivo</th>
+              <th>Saldo (resumen)</th>
+              <th>Diferencia</th>
+              <th>Sinc.</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="cuadraturas-local-body"></tbody>
+        </table>
+      </div>
+      <p id="cuadraturas-local-empty" class="cuadratura-historial-empty hidden">No hay cuadraturas guardadas en este dispositivo.</p>
+
+      <div id="cuadraturas-cloud-section" class="panel-cuadraturas-cloud">
+        <h3 class="panel-cuadraturas-subtitle">Supabase</h3>
+        <p id="cuadraturas-cloud-loading" class="cuadratura-historial-empty hidden">Cargando…</p>
+        <p id="cuadraturas-cloud-empty" class="cuadratura-historial-empty hidden">No hay cuadraturas en el servidor o sin permiso de lectura.</p>
+        <div id="cuadraturas-cloud-table-wrap" class="table-wrapper hidden">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Total efectivo</th>
+                <th>Usuario</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="cuadraturas-cloud-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
     <section id="panel-deleted" class="panel-deleted hidden">
       <div class="panel-deleted-header">

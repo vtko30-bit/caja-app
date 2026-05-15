@@ -289,7 +289,54 @@ function setOfflineBanner(offline) {
   }
 }
 
-const CUADRADURA_DENOMS = [100, 1000, 5000, 10000, 20000];
+const CUADRADURA_DENOMS = [100, 500, 1000, 5000, 10000, 20000];
+
+function getCuadraturaMontoInputEl(d) {
+  return document.getElementById(`cuad-monto-${d}`);
+}
+
+function parseCuadraturaMontoInput(el) {
+  const raw = String(el?.value ?? "").trim().replace(",", ".");
+  if (raw === "") return 0;
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.round(n);
+}
+
+function updateCuadraturaDenomHint(d, monto) {
+  const hintEl = document.getElementById(`cuad-hint-${d}`);
+  if (!hintEl) return;
+  if (monto === 0) {
+    hintEl.textContent = "—";
+    hintEl.className = "cuadratura-hint";
+    return;
+  }
+  if (monto % d !== 0) {
+    hintEl.textContent = "No múltiplo";
+    hintEl.className = "cuadratura-hint warn";
+    return;
+  }
+  const units = monto / d;
+  hintEl.textContent = `≈ ${units} bil.`;
+  hintEl.className = "cuadratura-hint";
+}
+
+function montoFromSnapshotForDenom(snap, d) {
+  if (!snap || typeof snap !== "object") return 0;
+  if (snap.amounts && typeof snap.amounts === "object" && snap.amounts[String(d)] != null) {
+    return Math.max(0, Math.round(Number(snap.amounts[String(d)]) || 0));
+  }
+  if (snap.inputMode === "monto" && snap.counts && snap.counts[String(d)] != null) {
+    return Math.max(0, Math.round(Number(snap.counts[String(d)]) || 0));
+  }
+  if (snap.counts && typeof snap.counts === "object" && snap.counts[String(d)] != null) {
+    const v = snap.counts[String(d)];
+    const qty = typeof v === "number" && Number.isFinite(v) ? v : parseInt(String(v), 10);
+    const n = Number.isFinite(qty) && qty >= 0 ? qty : 0;
+    return n * d;
+  }
+  return 0;
+}
 
 /** Saldo neto (ingresos − egresos) de una lista de movimientos. */
 function netBalanceFromMovements(movements) {
@@ -363,34 +410,30 @@ function recalcSummary() {
 function getCuadraturaPhysicalTotal() {
   let total = 0;
   CUADRADURA_DENOMS.forEach((d) => {
-    const el = document.getElementById(`cuad-cant-${d}`);
-    const raw = String(el?.value ?? "").trim();
-    const n = raw === "" ? 0 : parseInt(raw, 10);
-    const qty = Number.isFinite(n) && n >= 0 ? n : 0;
-    total += qty * d;
+    total += parseCuadraturaMontoInput(getCuadraturaMontoInputEl(d));
   });
   return total;
 }
 
-function getCuadraturaCantidades() {
-  const counts = {};
+function getCuadraturaAmounts() {
+  const amounts = {};
   CUADRADURA_DENOMS.forEach((d) => {
-    const el = document.getElementById(`cuad-cant-${d}`);
-    const raw = String(el?.value ?? "").trim();
-    const n = raw === "" ? 0 : parseInt(raw, 10);
-    counts[String(d)] = Number.isFinite(n) && n >= 0 ? n : 0;
+    amounts[String(d)] = parseCuadraturaMontoInput(getCuadraturaMontoInputEl(d));
   });
-  return counts;
+  return amounts;
 }
 
 function getCuadraturaSnapshot() {
   const { desde, hasta } = getFilterDateBounds();
   const totals = getSummaryTotals();
   const physical = getCuadraturaPhysicalTotal();
+  const amounts = getCuadraturaAmounts();
   const compareEl = document.getElementById("cuad-comparacion");
   return {
     savedAt: new Date().toISOString(),
-    counts: getCuadraturaCantidades(),
+    inputMode: "monto",
+    amounts,
+    counts: amounts,
     totalFisico: physical,
     saldoResumen: totals.saldo,
     saldoInicial: totals.saldoInicial,
@@ -437,6 +480,7 @@ function saveCuadraturaCopy() {
     }, 2800);
   }
   refreshCuadraturaHistorialUi();
+  refreshCuadraturasVistaIfOpen();
 }
 
 function setCuadraturaHistorialMsg(text, isWarn) {
@@ -458,9 +502,14 @@ function setCuadraturaCloudMsg(text, isWarn) {
 function isLikelyCuadraturaSnapshot(o) {
   if (!o || typeof o !== "object") return false;
   if (typeof o.savedAt !== "string" || !o.savedAt.trim()) return false;
+  if (o.amounts && typeof o.amounts === "object") return true;
   if (o.counts && typeof o.counts === "object") return true;
   if (typeof o.totalFisico === "number") return true;
   return false;
+}
+
+function snapshotHasDenomData(snap) {
+  return !!(snap?.amounts || snap?.counts);
 }
 
 function mergeCuadraturaSnapshotsFromArray(imported) {
@@ -516,6 +565,7 @@ async function handleCuadraturaImportFile(file) {
   }
   const { added, skipped, invalid } = mergeCuadraturaSnapshotsFromArray(arr);
   refreshCuadraturaHistorialUi();
+  refreshCuadraturasVistaIfOpen();
   const parts = [];
   if (added) parts.push(`${added} importada(s)`);
   if (skipped) parts.push(`${skipped} omitida(s) (mismo savedAt que una ya guardada)`);
@@ -734,17 +784,203 @@ async function uploadPendingCuadraturaSnapshots() {
   }
   setCuadraturaHistorialMsg(`Se subieron ${ids.length} cuadratura(s).`, false);
   refreshCuadraturaHistorialUi();
+  refreshCuadraturasVistaIfOpen();
+}
+
+function setCuadraturasVistaMsg(text, isWarn) {
+  const el = document.getElementById("cuadraturas-vista-msg");
+  if (!el) return;
+  el.textContent = text || "";
+  el.classList.toggle("hidden", !text);
+  el.classList.toggle("warn", !!isWarn);
+}
+
+function applySnapshotToCuadraturaForm(snap) {
+  if (!snapshotHasDenomData(snap)) {
+    showToast("Esta cuadratura no tiene montos por denominación.");
+    return false;
+  }
+  CUADRADURA_DENOMS.forEach((d) => {
+    const el = getCuadraturaMontoInputEl(d);
+    const monto = montoFromSnapshotForDenom(snap, d);
+    if (el) el.value = String(monto);
+  });
+  updateCuadraturaCompare();
+  const panel = document.getElementById("panel-cuadratura");
+  const btn = document.getElementById("btn-cuadratura-toggle");
+  if (panel) panel.classList.remove("hidden");
+  if (btn) btn.setAttribute("aria-expanded", "true");
+  hideCuadraturasSavedPanel();
+  showToast("Montos cargados en el formulario de cuadratura.");
+  return true;
+}
+
+function renderCuadraturasVistaLocalTable() {
+  const tbody = document.getElementById("cuadraturas-local-body");
+  const wrap = document.getElementById("cuadraturas-local-table-wrap");
+  const empty = document.getElementById("cuadraturas-local-empty");
+  if (!tbody || !wrap || !empty) return;
+  const list = readCuadraturaSnapshotsFromStorage();
+  const canWrite = isSuperRole() || !!(state.movementsPermissions || {}).can_write;
+  tbody.innerHTML = "";
+  const reversed = [...list].reverse();
+  if (reversed.length === 0) {
+    wrap.classList.add("hidden");
+    empty.classList.remove("hidden");
+    return;
+  }
+  wrap.classList.remove("hidden");
+  empty.classList.add("hidden");
+  reversed.forEach((snap) => {
+    const tr = document.createElement("tr");
+    const dt = snap.savedAt ? new Date(snap.savedAt) : null;
+    const fecha = dt && !Number.isNaN(dt.getTime())
+      ? dt.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+      : "—";
+    const tf = formatCurrency(snap.totalFisico ?? 0);
+    const saldo = formatCurrency(snap.saldoResumen ?? 0);
+    const diff = snap.diferenciaFisicoVsSaldo;
+    const diffStr = typeof diff === "number" && !Number.isNaN(diff) ? formatCurrency(diff) : "—";
+    const syncLabel = snap.supabaseId ? "En la nube" : "Solo local";
+    [fecha, tf, saldo, diffStr, syncLabel].forEach((txt) => {
+      const td = document.createElement("td");
+      td.textContent = txt;
+      tr.appendChild(td);
+    });
+    const tdBtn = document.createElement("td");
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn ghost cuadraturas-vista-action-btn";
+    b.textContent = "Usar en formulario";
+    b.disabled = !canWrite || !snapshotHasDenomData(snap);
+    b.addEventListener("click", () => applySnapshotToCuadraturaForm(snap));
+    tdBtn.appendChild(b);
+    tr.appendChild(tdBtn);
+    tbody.appendChild(tr);
+  });
+}
+
+async function renderCuadraturasVistaCloudTable() {
+  const section = document.getElementById("cuadraturas-cloud-section");
+  const loading = document.getElementById("cuadraturas-cloud-loading");
+  const empty = document.getElementById("cuadraturas-cloud-empty");
+  const wrap = document.getElementById("cuadraturas-cloud-table-wrap");
+  const tbody = document.getElementById("cuadraturas-cloud-body");
+  if (!section || !loading || !empty || !wrap || !tbody) return;
+  if (!state.useSupabase || !getSupabase()) {
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "";
+  const isSuper = isSuperRole();
+  const perms = state.movementsPermissions || { can_read: true, can_write: false };
+  const canRead = isSuper || !!perms.can_read;
+  const canWrite = isSuper || !!perms.can_write;
+  if (!canRead) {
+    loading.classList.add("hidden");
+    wrap.classList.add("hidden");
+    tbody.innerHTML = "";
+    empty.textContent = "No tenés permiso para leer cuadraturas en el servidor.";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.textContent = "No hay cuadraturas en el servidor.";
+  loading.classList.remove("hidden");
+  empty.classList.add("hidden");
+  wrap.classList.add("hidden");
+  tbody.innerHTML = "";
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("cuadratura_snapshots")
+    .select("id, saved_at, created_at, creator_email, payload")
+    .order("saved_at", { ascending: false })
+    .limit(100);
+  loading.classList.add("hidden");
+  if (error) {
+    console.error(error);
+    setCuadraturasVistaMsg(error.message || "Error al cargar desde Supabase.", true);
+    empty.classList.remove("hidden");
+    return;
+  }
+  setCuadraturasVistaMsg("", false);
+  const rows = data || [];
+  if (rows.length === 0) {
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  wrap.classList.remove("hidden");
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
+    const dt = row.saved_at ? new Date(row.saved_at) : null;
+    const fecha = dt && !Number.isNaN(dt.getTime())
+      ? dt.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+      : String(row.saved_at || "—");
+    const tf = formatCurrency(payload.totalFisico ?? 0);
+    const email = row.creator_email ? String(row.creator_email) : "";
+    const who = email.includes("@") ? email.split("@")[0] : (email || "—");
+    const td1 = document.createElement("td");
+    td1.textContent = fecha;
+    const td2 = document.createElement("td");
+    td2.textContent = tf;
+    const td3 = document.createElement("td");
+    td3.textContent = who;
+    tr.appendChild(td1);
+    tr.appendChild(td2);
+    tr.appendChild(td3);
+    const tdBtn = document.createElement("td");
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn ghost cuadraturas-vista-action-btn";
+    b.textContent = "Usar en formulario";
+    b.disabled = !canWrite || !snapshotHasDenomData(payload);
+    b.addEventListener("click", () => applySnapshotToCuadraturaForm(payload));
+    tdBtn.appendChild(b);
+    tr.appendChild(tdBtn);
+    tbody.appendChild(tr);
+  });
+}
+
+function showCuadraturasSavedPanel() {
+  const main = document.querySelector("main");
+  const panel = document.getElementById("panel-cuadraturas");
+  const deleted = document.getElementById("panel-deleted");
+  const admin = document.getElementById("panel-admin");
+  if (main) main.classList.add("hidden");
+  if (deleted) deleted.classList.add("hidden");
+  if (admin) admin.classList.add("hidden");
+  if (panel) panel.classList.remove("hidden");
+}
+
+function hideCuadraturasSavedPanel() {
+  const main = document.querySelector("main");
+  const panel = document.getElementById("panel-cuadraturas");
+  if (main) main.classList.remove("hidden");
+  if (panel) panel.classList.add("hidden");
+}
+
+async function refreshCuadraturasSavedPanelContent() {
+  renderCuadraturasVistaLocalTable();
+  await renderCuadraturasVistaCloudTable();
+}
+
+async function openCuadraturasSavedPanel() {
+  setCuadraturasVistaMsg("", false);
+  await refreshCuadraturasSavedPanelContent();
+  showCuadraturasSavedPanel();
+}
+
+function refreshCuadraturasVistaIfOpen() {
+  const panel = document.getElementById("panel-cuadraturas");
+  if (!panel || panel.classList.contains("hidden")) return;
+  void refreshCuadraturasSavedPanelContent();
 }
 
 function updateCuadraturaCompare() {
   CUADRADURA_DENOMS.forEach((d) => {
-    const el = document.getElementById(`cuad-cant-${d}`);
-    const subEl = document.getElementById(`cuad-sub-${d}`);
-    const raw = String(el?.value ?? "").trim();
-    const n = raw === "" ? 0 : parseInt(raw, 10);
-    const qty = Number.isFinite(n) && n >= 0 ? n : 0;
-    const sub = qty * d;
-    if (subEl) subEl.textContent = formatCurrency(sub);
+    const monto = parseCuadraturaMontoInput(getCuadraturaMontoInputEl(d));
+    updateCuadraturaDenomHint(d, monto);
   });
 
   const saldo = getSummaryTotals().saldo;
@@ -759,9 +995,7 @@ function updateCuadraturaCompare() {
   const saldoRedondeado = Math.round(saldo);
   const diff = physical - saldoRedondeado;
   if (physical === 0 && CUADRADURA_DENOMS.every((d) => {
-    const el = document.getElementById(`cuad-cant-${d}`);
-    const raw = String(el?.value ?? "").trim();
-    return raw === "" || raw === "0";
+    return parseCuadraturaMontoInput(getCuadraturaMontoInputEl(d)) === 0;
   })) {
     compareEl.textContent = "";
     compareEl.className = "cuadratura-msg";
@@ -795,14 +1029,14 @@ function setupCuadraturaListeners() {
     });
   }
   CUADRADURA_DENOMS.forEach((d) => {
-    const el = document.getElementById(`cuad-cant-${d}`);
+    const el = getCuadraturaMontoInputEl(d);
     if (el) el.addEventListener("input", updateCuadraturaCompare);
   });
   const btnClear = document.getElementById("btn-cuadratura-clear");
   if (btnClear) {
     btnClear.addEventListener("click", () => {
       CUADRADURA_DENOMS.forEach((d) => {
-        const el = document.getElementById(`cuad-cant-${d}`);
+        const el = getCuadraturaMontoInputEl(d);
         if (el) el.value = "0";
       });
       updateCuadraturaCompare();
@@ -1124,7 +1358,13 @@ function applyRolePermissions() {
   const btnCuadLimpiar = document.getElementById("btn-cuadratura-clear");
   if (btnCuadLimpiar) btnCuadLimpiar.disabled = !canWriteMovements;
 
+  const btnRefVista = document.getElementById("btn-cuadraturas-vista-refresh");
+  if (btnRefVista) {
+    btnRefVista.disabled = !state.useSupabase || !getSupabase() || !canReadMovements;
+  }
+
   refreshCuadraturaHistorialUi();
+  refreshCuadraturasVistaIfOpen();
 }
 
 async function createUserViaAdminApi() {
@@ -1462,8 +1702,10 @@ async function restoreMovement(id) {
 function showDeletedPanel() {
   const main = document.querySelector("main");
   const panel = document.getElementById("panel-deleted");
+  const cuad = document.getElementById("panel-cuadraturas");
   if (main) main.classList.add("hidden");
   if (panel) panel.classList.remove("hidden");
+  if (cuad) cuad.classList.add("hidden");
 }
 
 function hideDeletedPanel() {
@@ -1488,8 +1730,10 @@ function showAdminPanel() {
   const main = document.querySelector("main");
   const panel = document.getElementById("panel-admin");
   const deletedPanel = document.getElementById("panel-deleted");
+  const cuad = document.getElementById("panel-cuadraturas");
   if (main) main.classList.add("hidden");
   if (deletedPanel) deletedPanel.classList.add("hidden");
+  if (cuad) cuad.classList.add("hidden");
   if (panel) panel.classList.remove("hidden");
 }
 
@@ -1759,6 +2003,7 @@ function showAppContent() {
   if (app) app.classList.remove("hidden");
   hideAdminPanel();
   hideDeletedPanel();
+  hideCuadraturasSavedPanel();
   const btnLogout = document.getElementById("btn-logout");
   if (btnLogout) btnLogout.style.display = "";
   if (typeof syncMenuVisibility === "function") syncMenuVisibility();
@@ -2205,6 +2450,14 @@ function setupEventListeners() {
   });
   const btnVerEliminados = document.getElementById("btn-ver-eliminados");
   if (btnVerEliminados) btnVerEliminados.addEventListener("click", openDeletedPanel);
+  const btnVerCuadraturasGuardadas = document.getElementById("btn-ver-cuadraturas-guardadas");
+  if (btnVerCuadraturasGuardadas) btnVerCuadraturasGuardadas.addEventListener("click", () => void openCuadraturasSavedPanel());
+  const btnCuadraturasVistaVolver = document.getElementById("btn-cuadraturas-vista-volver");
+  if (btnCuadraturasVistaVolver) btnCuadraturasVistaVolver.addEventListener("click", hideCuadraturasSavedPanel);
+  const btnCuadraturasVistaRefresh = document.getElementById("btn-cuadraturas-vista-refresh");
+  if (btnCuadraturasVistaRefresh) {
+    btnCuadraturasVistaRefresh.addEventListener("click", () => void refreshCuadraturasSavedPanelContent());
+  }
   const btnVolver = document.getElementById("btn-volver-movimientos");
   if (btnVolver) btnVolver.addEventListener("click", hideDeletedPanel);
 
@@ -2230,6 +2483,8 @@ function setupEventListeners() {
   }
   const menuVer = document.getElementById("menu-ver-eliminados");
   if (menuVer) menuVer.addEventListener("click", () => { openDeletedPanel(); closeMenu(); });
+  const menuCuadraturas = document.getElementById("menu-ver-cuadraturas-guardadas");
+  if (menuCuadraturas) menuCuadraturas.addEventListener("click", () => { void openCuadraturasSavedPanel(); closeMenu(); });
   const menuExport = document.getElementById("menu-export");
   if (menuExport) menuExport.addEventListener("click", () => { exportJSON(); closeMenu(); });
   const menuExportExcel = document.getElementById("menu-export-excel");

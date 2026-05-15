@@ -477,6 +477,18 @@ body {
   margin: 0;
 }
 
+.summary-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-card-actions .btn {
+  font-size: 0.82rem;
+  padding: 7px 12px;
+}
+
 .btn-cuadratura-toggle {
   font-size: 0.82rem;
   padding: 7px 12px;
@@ -497,7 +509,7 @@ body {
 
 .cuadratura-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 1.1fr) minmax(72px, 0.85fr);
   align-items: center;
   gap: 10px;
   font-size: 0.86rem;
@@ -524,6 +536,17 @@ body {
   text-align: right;
   color: #94a3b8;
   font-variant-numeric: tabular-nums;
+}
+
+.cuadratura-hint {
+  text-align: right;
+  font-size: 0.76rem;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.cuadratura-hint.warn {
+  color: #fbbf24;
 }
 
 .cuadratura-totals {
@@ -1182,6 +1205,33 @@ body.offline-banner-visible {
 
 .panel-deleted .table-wrapper {
   max-height: 60vh;
+}
+
+.panel-cuadraturas .panel-cuadraturas-subtitle {
+  margin: 16px 0 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.panel-cuadraturas .panel-cuadraturas-subtitle:first-of-type {
+  margin-top: 0;
+}
+
+.panel-cuadraturas-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.panel-cuadraturas-cloud {
+  margin-top: 8px;
+}
+
+.cuadraturas-vista-action-btn {
+  font-size: 0.78rem !important;
+  padding: 4px 8px !important;
 }
 
 .panel-admin {
