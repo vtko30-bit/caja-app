@@ -100,6 +100,40 @@ Si quieres que solo quien tenga una cuenta pueda entrar:
 
 ---
 
+## Paso 8 (opcional): Iniciar sesión con Google (Gmail)
+
+Para que aparezca el botón **Continuar con Google** en la pantalla de login:
+
+### 8.1 Google Cloud Console
+
+1. Entra en **https://console.cloud.google.com** y crea un proyecto (o usa uno existente).
+2. Menú **APIs y servicios** → **Credenciales** → **Crear credenciales** → **ID de cliente de OAuth**.
+3. Tipo de aplicación: **Aplicación web**.
+4. En **Orígenes autorizados de JavaScript** añade:
+   - La URL de tu app en Vercel (ej. `https://tu-caja-app.vercel.app`)
+   - `http://localhost:5500` (o el puerto que uses en local)
+5. En **URIs de redirección autorizados** añade la URL de callback de Supabase:
+   - `https://TU_PROYECTO.supabase.co/auth/v1/callback`
+   - (La encuentras en Supabase → **Authentication** → **Providers** → **Google**)
+6. Copia el **Client ID** y el **Client Secret**.
+
+### 8.2 Supabase
+
+1. En Supabase → **Authentication** → **Providers** → **Google**.
+2. Activa el proveedor y pega el **Client ID** y **Client Secret** de Google.
+3. Guarda.
+4. En **Authentication** → **URL Configuration**:
+   - **Site URL:** URL de tu app en Vercel (ej. `https://tu-caja-app.vercel.app`)
+   - **Redirect URLs:** añade la misma URL de la app si no está.
+
+### 8.3 Desplegar
+
+Sube los cambios de la app a GitHub/Vercel (`git push origin main`). Tras el deploy, el botón **Continuar con Google** redirigirá a Gmail y volverá a la app con la sesión iniciada.
+
+**Nota:** Las cuentas nuevas por Google no tienen rol asignado automáticamente. Un usuario **super** debe darles permisos desde el panel de administración (rol y acceso al módulo de movimientos).
+
+---
+
 ## Si el enlace de confirmación te abre otra web (otro proyecto en Vercel)
 
 La cuenta **sí queda confirmada** al hacer clic en el enlace (aunque te lleve a otro sitio). Para entrar: abre **la URL de tu app Caja** en Vercel y usa **Entrar** con tu correo y contraseña.

@@ -2113,6 +2113,77 @@ async function openAdminPanel() {
   await loadAdminUsers();
 }
 
+function getAuthRedirectUrl() {
+  const path = window.location.pathname || "/";
+  return `${window.location.origin}${path}`;
+}
+
+async function handleOAuthReturn() {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get("code");
+  if (!code) return;
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  url.searchParams.delete("code");
+  url.searchParams.delete("state");
+  const cleanUrl = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState({}, document.title, cleanUrl || "/");
+
+  if (error) {
+    console.warn("Error al completar OAuth:", error);
+    showLoginScreen();
+    setupLoginListeners();
+    showLoginView("login");
+    setLoginError("No se pudo completar el inicio de sesión con Google. Intenta de nuevo.");
+  }
+}
+
+async function enterAppAfterAuth() {
+  showAppContent();
+  await loadCurrentUserRole();
+  if (state.currentRole !== "super") hideAdminPanel();
+  await initAppContent();
+  const btnLogout = document.getElementById("btn-logout");
+  if (btnLogout) btnLogout.style.display = "";
+}
+
+function setLoginButtonsDisabled(disabled) {
+  ["btn-login-entrar", "btn-login-crear", "btn-login-google"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = disabled;
+  });
+}
+
+async function doGoogleLogin() {
+  setLoginError("");
+  const supabase = getSupabase();
+  if (!supabase) {
+    setLoginError("Error de conexión. Recarga la página.");
+    return;
+  }
+
+  const btnGoogle = document.getElementById("btn-login-google");
+  const googleLabel = btnGoogle?.querySelector(".btn-google-label");
+  if (btnGoogle) btnGoogle.disabled = true;
+  if (googleLabel) googleLabel.textContent = "Redirigiendo…";
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: getAuthRedirectUrl(),
+    },
+  });
+
+  if (error) {
+    setLoginError(error.message || "No se pudo iniciar sesión con Google.");
+    if (btnGoogle) btnGoogle.disabled = false;
+    if (googleLabel) googleLabel.textContent = "Continuar con Google";
+  }
+}
+
 // --- Login / Auth (solo cuando useSupabase) ---
 function showLoginScreen() {
   const login = document.getElementById("login-screen");
@@ -2273,18 +2344,12 @@ async function doLogin() {
     setLoginError("No hay cuenta con este correo o la contraseña es incorrecta. Si es la primera vez, usa «Crear cuenta».");
     return;
   }
-  showAppContent();
-  const btnEntrar = document.getElementById("btn-login-entrar");
-  const btnCrear = document.getElementById("btn-login-crear");
-  if (btnEntrar) btnEntrar.disabled = true;
-  if (btnCrear) btnCrear.disabled = true;
-  await loadCurrentUserRole();
-  if (state.currentRole !== "super") hideAdminPanel();
-  await initAppContent();
-  if (btnEntrar) btnEntrar.disabled = false;
-  if (btnCrear) btnCrear.disabled = false;
-  const btnLogout = document.getElementById("btn-logout");
-  if (btnLogout) btnLogout.style.display = "";
+  setLoginButtonsDisabled(true);
+  try {
+    await enterAppAfterAuth();
+  } finally {
+    setLoginButtonsDisabled(false);
+  }
 }
 
 async function doSignUp() {
@@ -2336,17 +2401,12 @@ async function doSignUp() {
     return;
   }
   showAppContent();
-  const btnEntrar = document.getElementById("btn-login-entrar");
-  const btnCrear = document.getElementById("btn-login-crear");
-  if (btnEntrar) btnEntrar.disabled = true;
-  if (btnCrear) btnCrear.disabled = true;
-  await loadCurrentUserRole();
-  if (state.currentRole !== "super") hideAdminPanel();
-  await initAppContent();
-  if (btnEntrar) btnEntrar.disabled = false;
-  if (btnCrear) btnCrear.disabled = false;
-  const btnLogout = document.getElementById("btn-logout");
-  if (btnLogout) btnLogout.style.display = "";
+  setLoginButtonsDisabled(true);
+  try {
+    await enterAppAfterAuth();
+  } finally {
+    setLoginButtonsDisabled(false);
+  }
 }
 
 function showLoginView(view) {
@@ -2366,6 +2426,7 @@ function setupLoginListeners() {
   const btnVolver = document.getElementById("btn-volver-login");
   const btnEnviarEnlace = document.getElementById("btn-enviar-enlace");
   const btnGuardarPassword = document.getElementById("btn-guardar-password");
+  const btnGoogle = document.getElementById("btn-login-google");
   if (!form) return;
 
   form.addEventListener("submit", (e) => {
@@ -2375,6 +2436,7 @@ function setupLoginListeners() {
 
   if (btnEntrar) btnEntrar.addEventListener("click", (e) => { e.preventDefault(); doLogin(); });
   if (btnCrear) btnCrear.addEventListener("click", (e) => { e.preventDefault(); doSignUp(); });
+  if (btnGoogle) btnGoogle.addEventListener("click", (e) => { e.preventDefault(); void doGoogleLogin(); });
 
   if (btnOlvide) btnOlvide.addEventListener("click", () => {
     setLoginMessage("", false);
@@ -2421,7 +2483,7 @@ async function doForgotPassword() {
     setRecoverMessage("Error de conexión. Recarga la página.", false);
     return;
   }
-  const redirectTo = window.location.origin + window.location.pathname + window.location.search;
+  const redirectTo = getAuthRedirectUrl();
   const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
   if (error) {
     const msg = (error.message || "").toLowerCase();
@@ -2701,6 +2763,7 @@ async function init() {
   applySavedTheme();
   try {
     if (state.useSupabase && getSupabase()) {
+      await handleOAuthReturn();
       const session = await getSession();
       if (!session) {
         showLoginScreen();
@@ -2712,9 +2775,8 @@ async function init() {
         }
         return;
       }
-      await loadCurrentUserRole();
-      showAppContent();
-      if (state.currentRole !== "super") hideAdminPanel();
+      await enterAppAfterAuth();
+      return;
     }
 
     await initAppContent();

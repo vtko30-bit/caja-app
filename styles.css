@@ -234,6 +234,58 @@ body {
 }
 .login-actions .btn { width: 100%; }
 
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.btn-google {
+  width: 100%;
+  border-radius: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background-color 0.14s ease, border-color 0.14s ease, transform 0.06s ease;
+}
+
+.btn-google:hover:not(:disabled) {
+  background: var(--surface-muted);
+  border-color: rgba(148, 163, 184, 0.55);
+  transform: translateY(-0.5px);
+}
+
+.btn-google:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.btn-google-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .login-link-wrap {
   margin: 14px 0 0;
   text-align: center;
