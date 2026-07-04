@@ -1,6 +1,33 @@
 // Caja - Movimientos (local y/o online con Supabase)
 const STORAGE_KEY = "caja_movimientos_v1";
 const STORAGE_KEY_CUADRATURA = "caja_cuadratura_copias_v1";
+const THEME_STORAGE_KEY = "caja_theme";
+
+function applySavedTheme() {
+  const saved = localStorage.getItem(THEME_STORAGE_KEY);
+  if (saved === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+}
+
+function toggleTheme() {
+  const root = document.documentElement;
+  const isLight = root.getAttribute("data-theme") === "light";
+  if (isLight) {
+    root.removeAttribute("data-theme");
+    localStorage.setItem(THEME_STORAGE_KEY, "dark");
+  } else {
+    root.setAttribute("data-theme", "light");
+    localStorage.setItem(THEME_STORAGE_KEY, "light");
+  }
+}
+
+function setupThemeToggle() {
+  const btn = document.getElementById("btn-theme-toggle");
+  if (btn) btn.addEventListener("click", toggleTheme);
+}
 
 let cuadraturaSaveFeedbackTimer = null;
 let cuadraturaCloudLoadToken = 0;
@@ -290,6 +317,7 @@ function setOfflineBanner(offline) {
 }
 
 const CUADRADURA_DENOMS = [100, 500, 1000, 5000, 10000, 20000];
+const MOVEMENT_SELECT_EMPTY_LABEL = "Seleccione una opción...";
 
 function getCuadraturaMontoInputEl(d) {
   return document.getElementById(`cuad-monto-${d}`);
@@ -317,7 +345,7 @@ function updateCuadraturaDenomHint(d, monto) {
     return;
   }
   const units = monto / d;
-  hintEl.textContent = `≈ ${units} bil.`;
+  hintEl.textContent = String(units);
   hintEl.className = "cuadratura-hint";
 }
 
@@ -1090,28 +1118,38 @@ function setupCuadraturaListeners() {
   }
 }
 
-function updateLocalDatalist() {
-  const datalist = document.getElementById("local-datalist");
-  if (!datalist) return;
-  const locales = [...new Set(state.movements.map((m) => (m.local || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
-  datalist.innerHTML = "";
-  locales.forEach((nombre) => {
+function populateMovementSelect(selectEl, movementField, selectedValue) {
+  if (!selectEl) return;
+  const preserve = selectedValue !== undefined
+    ? String(selectedValue ?? "").trim()
+    : String(selectEl.value ?? "").trim();
+  const names = new Set(
+    state.movements
+      .map((m) => (m[movementField] || "").trim())
+      .filter(Boolean)
+  );
+  if (preserve) names.add(preserve);
+  const sorted = [...names].sort((a, b) => a.localeCompare(b, "es"));
+  selectEl.innerHTML = "";
+  const emptyOpt = document.createElement("option");
+  emptyOpt.value = "";
+  emptyOpt.textContent = MOVEMENT_SELECT_EMPTY_LABEL;
+  selectEl.appendChild(emptyOpt);
+  sorted.forEach((nombre) => {
     const opt = document.createElement("option");
     opt.value = nombre;
-    datalist.appendChild(opt);
+    opt.textContent = nombre;
+    selectEl.appendChild(opt);
   });
+  selectEl.value = preserve && names.has(preserve) ? preserve : "";
 }
 
-function updateConceptDatalist() {
-  const datalist = document.getElementById("concept-datalist");
-  if (!datalist) return;
-  const conceptos = [...new Set(state.movements.map((m) => (m.concept || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
-  datalist.innerHTML = "";
-  conceptos.forEach((nombre) => {
-    const opt = document.createElement("option");
-    opt.value = nombre;
-    datalist.appendChild(opt);
-  });
+function updateLocalDatalist(selectedValue) {
+  populateMovementSelect(document.getElementById("local"), "local", selectedValue);
+}
+
+function updateConceptDatalist(selectedValue) {
+  populateMovementSelect(document.getElementById("concept"), "concept", selectedValue);
 }
 
 function applyFilters(movements) {
@@ -1165,11 +1203,14 @@ function renderTable() {
   });
   sorted.forEach((m) => {
     const tr = document.createElement("tr");
-    tr.appendChild(createCell(formatShortId(m.id)));
-    tr.appendChild(createCell(m.date || ""));
-    tr.appendChild(createCell(m.local || ""));
-    tr.appendChild(createCell(m.concept || ""));
+    tr.className = "movement-row";
+    tr.dataset.type = m.type === "egreso" ? "egreso" : "ingreso";
+    tr.appendChild(createCell(formatShortId(m.id), "cell-id"));
+    tr.appendChild(createCell(m.date || "", "cell-date"));
+    tr.appendChild(createCell(m.local || "", "cell-local"));
+    tr.appendChild(createCell(m.concept || "", "cell-concept"));
     const tdType = document.createElement("td");
+    tdType.className = "cell-type";
     const spanType = document.createElement("span");
     spanType.className = `cell-type ${m.type}`;
     spanType.textContent = m.type === "ingreso" ? "Ingreso" : "Egreso";
@@ -1179,9 +1220,13 @@ function renderTable() {
     tdAmount.className = "cell-amount";
     tdAmount.textContent = formatCurrency(m.amount);
     tr.appendChild(tdAmount);
-    tr.appendChild(createCell(m.notes || ""));
-    tr.appendChild(createCell(m.creator_email || "—"));
+    const notesText = (m.notes || "").trim();
+    const tdNotes = createCell(notesText, "cell-notes");
+    if (!notesText) tdNotes.classList.add("cell-notes-empty");
+    tr.appendChild(tdNotes);
+    tr.appendChild(createCell(m.creator_email || "—", "cell-creator"));
     const tdActions = document.createElement("td");
+    tdActions.className = "cell-actions";
     const actions = document.createElement("div");
     actions.className = "row-actions";
     const btnEdit = document.createElement("button");
@@ -1412,19 +1457,96 @@ async function createUserViaAdminApi() {
   }
 }
 
-function createCell(text) {
+function createCell(text, className) {
   const td = document.createElement("td");
-  td.textContent = text;
+  if (className) td.className = className;
+  td.textContent = text ?? "";
   return td;
+}
+
+function clearMovementFormErrors() {
+  const msg = document.getElementById("movement-form-error");
+  if (msg) {
+    msg.textContent = "";
+    msg.classList.add("hidden");
+  }
+  document.querySelectorAll("#movement-form .field.has-error").forEach((el) => {
+    el.classList.remove("has-error");
+  });
+}
+
+function showMovementFormError(message, fieldIds = []) {
+  const msg = document.getElementById("movement-form-error");
+  if (msg) {
+    msg.textContent = message;
+    msg.classList.remove("hidden");
+  }
+  fieldIds.forEach((id) => {
+    const input = document.getElementById(id);
+    const field = input?.closest(".field");
+    if (field) field.classList.add("has-error");
+  });
+  msg?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function validateMovementForm(form) {
+  const missingFields = [];
+  const missingLabels = [];
+  const date = (form.date?.value || "").trim();
+  const concept = (form.concept?.value || "").trim();
+  const amountStr = String(form.amount?.value ?? "").trim().replace(",", ".");
+  const amount = parseFloat(amountStr);
+
+  if (!date) {
+    missingFields.push("date");
+    missingLabels.push("fecha");
+  }
+  if (!concept) {
+    missingFields.push("concept");
+    missingLabels.push("concepto");
+  }
+  if (form.amount?.value === "" || form.amount?.value == null) {
+    missingFields.push("amount");
+    missingLabels.push("monto");
+  } else if (isNaN(amount) || amount < 0) {
+    missingFields.push("amount");
+    missingLabels.push("monto válido (≥ 0)");
+  }
+
+  if (missingFields.length === 0) {
+    return { valid: true, fields: [], message: "", date, concept, amount, amountStr };
+  }
+
+  const message = missingLabels.length === 1
+    ? `Completá el campo obligatorio: ${missingLabels[0]}.`
+    : `Completá los campos obligatorios: ${missingLabels.join(", ")}.`;
+  return { valid: false, fields: missingFields, message };
+}
+
+function setMovementFormSubmitting(submitting, submitBtn) {
+  if (!submitBtn) return;
+  if (submitting) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Guardando...";
+  } else {
+    submitBtn.textContent = state.editingId ? "Actualizar" : "Guardar";
+    submitBtn.disabled = false;
+    applyRolePermissions();
+  }
 }
 
 function resetForm() {
   const form = document.getElementById("movement-form");
   if (form) {
     form.reset();
-    const submitBtn = form.querySelector("button[type='submit']");
-    if (submitBtn) submitBtn.textContent = "Guardar";
+    const dateInput = document.getElementById("date");
+    if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+    const typeEl = document.getElementById("type");
+    if (typeEl) typeEl.value = "ingreso";
+    updateLocalDatalist("");
+    updateConceptDatalist("");
   }
+  clearMovementFormErrors();
   state.editingId = null;
 }
 
@@ -1437,16 +1559,19 @@ function startEdit(id) {
   }
   const form = document.getElementById("movement-form");
   if (!form) return;
-  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ""; };
+  updateLocalDatalist(movement.local);
+  updateConceptDatalist(movement.concept);
   set("date", movement.date);
-  set("local", movement.local);
-  set("concept", movement.concept);
   set("type", movement.type || "ingreso");
   set("amount", movement.amount);
   set("notes", movement.notes);
   state.editingId = id;
+  clearMovementFormErrors();
   const submitBtn = form.querySelector("button[type='submit']");
-  if (submitBtn) submitBtn.textContent = "Actualizar";
+  if (submitBtn) {
+    submitBtn.textContent = "Actualizar";
+  }
 }
 
 function deleteMovement(id) {
@@ -1480,100 +1605,100 @@ function deleteMovement(id) {
 async function handleSubmit(event) {
   event.preventDefault();
   const form = event.target;
-  const date = (form.date?.value || "").trim();
-  const concept = (form.concept?.value || "").trim();
+  const submitBtn = form.querySelector('button[type="submit"]');
+
+  clearMovementFormErrors();
+
+  const validation = validateMovementForm(form);
+  if (!validation.valid) {
+    showMovementFormError(validation.message, validation.fields);
+    return;
+  }
+
+  const { date, concept, amount } = validation;
   const type = form.type?.value || "ingreso";
-  const amountStr = String(form.amount?.value ?? "").trim().replace(",", ".");
-  const amount = parseFloat(amountStr);
   const local = (form.local?.value || "").trim();
   const notes = (form.notes?.value || "").trim();
-  if (!date || !concept || !type) {
-    alert("Completa fecha, concepto y tipo.");
-    return;
-  }
-  if (form.amount?.value === "" || form.amount?.value == null) {
-    alert("Completa el monto.");
-    return;
-  }
-  if (isNaN(amount) || amount < 0) {
-    alert("El monto debe ser un número mayor o igual a 0.");
-    return;
-  }
   const payload = { date, local, concept, type, amount, notes };
 
-  const supabase = getSupabase();
-  if (state.useSupabase && supabase && navigator.onLine) {
+  setMovementFormSubmitting(true, submitBtn);
+  try {
+    const supabase = getSupabase();
+    if (state.useSupabase && supabase && navigator.onLine) {
+      if (state.editingId) {
+        const existing = state.movements.find((x) => x.id === state.editingId);
+        if (existing && !canEditMovement(existing)) {
+          showCenterDialog("No puede editar este movimiento.");
+          return;
+        }
+        const { error } = await supabase.from("movements").update(payload).eq("id", state.editingId);
+        if (error) {
+          showToast("Error al actualizar: " + (error.message || "revisa la conexión."));
+          return;
+        }
+        showToast("Movimiento actualizado.");
+      } else {
+        const { data, error } = await supabase
+          .from("movements")
+          .insert(payload)
+          .select("id, creator_email, created_by")
+          .single();
+        if (error) {
+          showToast("Error al guardar: " + (error.message || "revisa la conexión."));
+          return;
+        }
+        showToast("Movimiento agregado.");
+        state.movements = [
+          ...state.movements,
+          {
+            id: data.id,
+            ...payload,
+            creator_email: data.creator_email || "",
+            created_by: data.created_by || null,
+          },
+        ];
+        renderTable();
+        resetForm();
+        requestAnimationFrame(() => {
+          renderTable();
+          const tbody = document.getElementById("movements-body");
+          if (tbody && tbody.lastElementChild) tbody.lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+        loadMovementsFromSupabase().then((list) => {
+          if (Array.isArray(list)) {
+            state.movements = list;
+            renderTable();
+          }
+        }).catch(() => {});
+        return;
+      }
+      state.movements = await loadMovementsFromSupabase();
+      renderTable();
+      resetForm();
+      return;
+    }
+
     if (state.editingId) {
       const existing = state.movements.find((x) => x.id === state.editingId);
       if (existing && !canEditMovement(existing)) {
         showCenterDialog("No puede editar este movimiento.");
         return;
       }
-      const { error } = await supabase.from("movements").update(payload).eq("id", state.editingId);
-      if (error) {
-        showToast("Error al actualizar: " + (error.message || "revisa la conexión."));
-        return;
-      }
+      state.movements = state.movements.map((m) =>
+        m.id === state.editingId ? { ...m, ...payload } : m
+      );
       showToast("Movimiento actualizado.");
     } else {
-      const { data, error } = await supabase
-        .from("movements")
-        .insert(payload)
-        .select("id, creator_email, created_by")
-        .single();
-      if (error) {
-        showToast("Error al guardar: " + (error.message || "revisa la conexión."));
-        return;
-      }
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      state.movements.push({ id, ...payload, created_by: null, creator_email: "" });
       showToast("Movimiento agregado.");
-      state.movements = [
-        ...state.movements,
-        {
-          id: data.id,
-          ...payload,
-          creator_email: data.creator_email || "",
-          created_by: data.created_by || null,
-        },
-      ];
-      renderTable();
-      resetForm();
-      requestAnimationFrame(() => {
-        renderTable();
-        const tbody = document.getElementById("movements-body");
-        if (tbody && tbody.lastElementChild) tbody.lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      });
-      loadMovementsFromSupabase().then((list) => {
-        if (Array.isArray(list)) {
-          state.movements = list;
-          renderTable();
-        }
-      }).catch(() => {});
-      return;
     }
-    state.movements = await loadMovementsFromSupabase();
+    saveMovementsLocal(state.movements);
     renderTable();
     resetForm();
-    return;
+  } finally {
+    setMovementFormSubmitting(false, submitBtn);
   }
-
-  if (state.editingId) {
-    const existing = state.movements.find((x) => x.id === state.editingId);
-    if (existing && !canEditMovement(existing)) {
-      showCenterDialog("No puede editar este movimiento.");
-      return;
-    }
-    state.movements = state.movements.map((m) =>
-      m.id === state.editingId ? { ...m, ...payload } : m
-    );
-    showToast("Movimiento actualizado.");
-  } else {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    state.movements.push({ id, ...payload, created_by: null, creator_email: "" });
-    showToast("Movimiento agregado.");
-  }
-  saveMovementsLocal(state.movements);
-  renderTable();
-  resetForm();
 }
 
 function exportJSON() {
@@ -2379,8 +2504,24 @@ function setupEventListeners() {
   const form = document.getElementById("movement-form");
   if (form) form.addEventListener("submit", handleSubmit);
 
+  ["date", "concept", "amount"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("input", () => {
+        el.closest(".field")?.classList.remove("has-error");
+        const errEl = document.getElementById("movement-form-error");
+        if (errEl && !document.querySelector("#movement-form .field.has-error")) {
+          errEl.textContent = "";
+          errEl.classList.add("hidden");
+        }
+      });
+    }
+  });
+
   const btnClear = document.getElementById("btn-clear-form");
   if (btnClear) btnClear.addEventListener("click", (e) => { e.preventDefault(); resetForm(); });
+
+  setupThemeToggle();
 
   const dateInput = document.getElementById("date");
   const btnCalendar = document.getElementById("btn-open-calendar");
@@ -2557,6 +2698,7 @@ function setupOfflineDetection() {
 }
 
 async function init() {
+  applySavedTheme();
   try {
     if (state.useSupabase && getSupabase()) {
       const session = await getSession();

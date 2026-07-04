@@ -102,6 +102,7 @@
         </div>
         <div class="topbar-right">
           <div class="topbar-actions">
+            <button type="button" class="btn secondary" id="btn-theme-toggle">Cambiar Tema</button>
             <button type="button" class="btn secondary" id="btn-go-portal">Volver al menu principal</button>
             <button type="button" class="btn secondary" id="btn-logout" style="display: none;">Cerrar sesión</button>
             <button type="button" class="btn secondary" id="btn-ver-eliminados" style="display: none;">Ver eliminados</button>
@@ -146,29 +147,16 @@
             </div>
             <div class="field">
               <label for="local">Local</label>
-              <input
-                id="local"
-                name="local"
-                type="text"
-                list="local-datalist"
-                placeholder="Ej: Sucursal centro"
-                autocomplete="off"
-              />
-              <datalist id="local-datalist"></datalist>
+              <select id="local" name="local">
+                <option value="">Seleccione una opción...</option>
+              </select>
             </div>
           </div>
           <div class="field">
             <label for="concept">Concepto</label>
-            <input
-              id="concept"
-              name="concept"
-              type="text"
-              list="concept-datalist"
-              placeholder="Ej: Venta contado"
-              autocomplete="off"
-              required
-            />
-            <datalist id="concept-datalist"></datalist>
+            <select id="concept" name="concept" required>
+              <option value="">Seleccione una opción...</option>
+            </select>
           </div>
           <div class="field-inline">
             <div class="field">
@@ -200,6 +188,7 @@
               placeholder="Detalle adicional..."
             ></textarea>
           </div>
+          <p id="movement-form-error" class="form-error hidden" role="alert" aria-live="polite"></p>
           <div class="actions">
             <button type="submit" class="btn primary">Guardar</button>
             <button type="reset" class="btn ghost" id="btn-clear-form">
@@ -379,8 +368,8 @@
             </div>
           </div>
         </div>
-        <div class="table-wrapper">
-          <table>
+        <div class="table-wrapper movements-table-wrapper">
+          <table class="movements-table">
             <thead>
               <tr>
                 <th>
