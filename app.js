@@ -2693,6 +2693,8 @@ function setupEventListeners() {
   if (menuVer) menuVer.addEventListener("click", () => { openDeletedPanel(); closeMenu(); });
   const menuCuadraturas = document.getElementById("menu-ver-cuadraturas-guardadas");
   if (menuCuadraturas) menuCuadraturas.addEventListener("click", () => { void openCuadraturasSavedPanel(); closeMenu(); });
+  const menuTheme = document.getElementById("menu-theme-toggle");
+  if (menuTheme) menuTheme.addEventListener("click", () => { toggleTheme(); closeMenu(); });
   const menuExport = document.getElementById("menu-export");
   if (menuExport) menuExport.addEventListener("click", () => { exportJSON(); closeMenu(); });
   const menuExportExcel = document.getElementById("menu-export-excel");
