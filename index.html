@@ -335,6 +335,10 @@
       <section class="card card-table">
         <div class="table-header">
           <h2>Movimientos</h2>
+          <div class="movements-view-toggle" role="group" aria-label="Vista de movimientos">
+            <button type="button" class="btn-view-mode is-active" id="btn-movements-view-cards" data-view="cards" aria-pressed="true">Tarjetas</button>
+            <button type="button" class="btn-view-mode" id="btn-movements-view-list" data-view="list" aria-pressed="false">Lista</button>
+          </div>
           <div class="table-filters">
             <div class="filters-toggle-row">
               <div class="filter-text-wrap">
@@ -394,7 +398,7 @@
             </div>
           </div>
         </div>
-        <div class="table-wrapper movements-table-wrapper">
+        <div class="table-wrapper movements-table-wrapper view-cards">
           <table class="movements-table">
             <thead>
               <tr>

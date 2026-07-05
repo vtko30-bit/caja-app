@@ -2,6 +2,7 @@
 const STORAGE_KEY = "caja_movimientos_v1";
 const STORAGE_KEY_CUADRATURA = "caja_cuadratura_copias_v1";
 const THEME_STORAGE_KEY = "caja_theme";
+const MOVEMENTS_VIEW_KEY = "caja_movements_view";
 
 function applySavedTheme() {
   const saved = localStorage.getItem(THEME_STORAGE_KEY);
@@ -27,6 +28,35 @@ function toggleTheme() {
 function setupThemeToggle() {
   const btn = document.getElementById("btn-theme-toggle");
   if (btn) btn.addEventListener("click", toggleTheme);
+}
+
+function getMovementsView() {
+  return localStorage.getItem(MOVEMENTS_VIEW_KEY) === "list" ? "list" : "cards";
+}
+
+function applyMovementsView(view) {
+  const wrap = document.querySelector(".movements-table-wrapper");
+  if (!wrap) return;
+  const mode = view === "list" ? "list" : "cards";
+  wrap.classList.remove("view-cards", "view-list");
+  wrap.classList.add(mode === "list" ? "view-list" : "view-cards");
+  localStorage.setItem(MOVEMENTS_VIEW_KEY, mode);
+  const btnCards = document.getElementById("btn-movements-view-cards");
+  const btnList = document.getElementById("btn-movements-view-list");
+  if (btnCards) {
+    btnCards.classList.toggle("is-active", mode === "cards");
+    btnCards.setAttribute("aria-pressed", mode === "cards" ? "true" : "false");
+  }
+  if (btnList) {
+    btnList.classList.toggle("is-active", mode === "list");
+    btnList.setAttribute("aria-pressed", mode === "list" ? "true" : "false");
+  }
+}
+
+function setupMovementsViewToggle() {
+  applyMovementsView(getMovementsView());
+  document.getElementById("btn-movements-view-cards")?.addEventListener("click", () => applyMovementsView("cards"));
+  document.getElementById("btn-movements-view-list")?.addEventListener("click", () => applyMovementsView("list"));
 }
 
 let cuadraturaSaveFeedbackTimer = null;
@@ -2589,6 +2619,7 @@ function setupEventListeners() {
   if (btnClear) btnClear.addEventListener("click", (e) => { e.preventDefault(); resetForm(); });
 
   setupThemeToggle();
+  setupMovementsViewToggle();
 
   const dateInput = document.getElementById("date");
   const btnCalendar = document.getElementById("btn-open-calendar");

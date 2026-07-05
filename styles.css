@@ -1074,6 +1074,36 @@ textarea::placeholder {
   gap: 10px;
   margin-bottom: 8px;
   max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.movements-view-toggle {
+  display: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.btn-view-mode {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 11px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.btn-view-mode.is-active {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.btn-view-mode:not(.is-active):hover {
+  background: var(--surface-muted);
+  color: var(--text);
 }
 
 .table-filters {
@@ -1272,9 +1302,14 @@ tbody tr:hover {
   background: rgba(248, 113, 113, 0.2);
 }
 
-/* Movimientos: tarjetas en móvil, tabla en escritorio */
+/* Movimientos: en móvil, tarjetas o lista según preferencia */
 @media (max-width: 768px) {
-  .movements-table-wrapper {
+  .movements-view-toggle {
+    display: inline-flex;
+  }
+
+  /* —— Vista tarjetas —— */
+  .movements-table-wrapper.view-cards {
     overflow: visible;
     max-height: none;
     border: none;
@@ -1282,22 +1317,22 @@ tbody tr:hover {
     padding: 0;
   }
 
-  .movements-table {
+  .movements-table-wrapper.view-cards .movements-table {
     display: block;
     width: 100%;
   }
 
-  .movements-table thead {
+  .movements-table-wrapper.view-cards .movements-table thead {
     display: none;
   }
 
-  .movements-table tbody {
+  .movements-table-wrapper.view-cards .movements-table tbody {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
 
-  .movements-table tbody tr.movement-row {
+  .movements-table-wrapper.view-cards .movements-table tbody tr.movement-row {
     display: grid;
     grid-template-columns: 1fr auto;
     grid-template-areas:
@@ -1315,22 +1350,22 @@ tbody tr:hover {
     box-shadow: var(--movement-card-shadow);
   }
 
-  .movements-table tbody tr.movement-row:nth-child(even),
-  .movements-table tbody tr.movement-row:hover {
+  .movements-table-wrapper.view-cards .movements-table tbody tr.movement-row:nth-child(even),
+  .movements-table-wrapper.view-cards .movements-table tbody tr.movement-row:hover {
     background: var(--movement-card-bg);
   }
 
-  .movements-table tbody tr.movement-row:active {
+  .movements-table-wrapper.view-cards .movements-table tbody tr.movement-row:active {
     border-color: rgba(59, 130, 246, 0.55);
   }
 
-  .movements-table td {
+  .movements-table-wrapper.view-cards .movements-table td {
     display: block;
     padding: 0;
     border-bottom: none;
   }
 
-  .movements-table .cell-concept {
+  .movements-table-wrapper.view-cards .cell-concept {
     grid-area: concept;
     font-size: 0.95rem;
     font-weight: 600;
@@ -1339,7 +1374,7 @@ tbody tr:hover {
     word-break: break-word;
   }
 
-  .movements-table .cell-date {
+  .movements-table-wrapper.view-cards .cell-date {
     grid-area: date;
     text-align: right;
     font-size: 0.8rem;
@@ -1348,25 +1383,25 @@ tbody tr:hover {
     align-self: start;
   }
 
-  .movements-table .cell-local {
+  .movements-table-wrapper.view-cards .cell-local {
     grid-area: local;
     font-size: 0.84rem;
     color: var(--muted);
   }
 
-  .movements-table .cell-local:empty::before {
+  .movements-table-wrapper.view-cards .cell-local:empty::before {
     content: "Sin local";
     color: var(--muted);
     font-style: italic;
   }
 
-  .movements-table .cell-type {
+  .movements-table-wrapper.view-cards .cell-type {
     grid-area: type;
     justify-self: start;
     align-self: center;
   }
 
-  .movements-table .cell-amount {
+  .movements-table-wrapper.view-cards .cell-amount {
     grid-area: amount;
     justify-self: end;
     align-self: center;
@@ -1375,27 +1410,27 @@ tbody tr:hover {
     text-align: right;
   }
 
-  .movements-table .movement-row[data-type="ingreso"] .cell-amount {
+  .movements-table-wrapper.view-cards .movement-row[data-type="ingreso"] .cell-amount {
     color: var(--positive);
   }
 
-  .movements-table .movement-row[data-type="egreso"] .cell-amount {
+  .movements-table-wrapper.view-cards .movement-row[data-type="egreso"] .cell-amount {
     color: var(--danger);
   }
 
-  .movements-table .cell-id {
+  .movements-table-wrapper.view-cards .cell-id {
     grid-area: id;
     font-size: 0.72rem;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
 
-  .movements-table .cell-id::before {
+  .movements-table-wrapper.view-cards .cell-id::before {
     content: "ID ";
     color: #475569;
   }
 
-  .movements-table .cell-creator {
+  .movements-table-wrapper.view-cards .cell-creator {
     grid-area: creator;
     text-align: right;
     font-size: 0.72rem;
@@ -1403,7 +1438,7 @@ tbody tr:hover {
     word-break: break-all;
   }
 
-  .movements-table .cell-notes {
+  .movements-table-wrapper.view-cards .cell-notes {
     grid-area: notes;
     font-size: 0.8rem;
     color: var(--muted);
@@ -1412,25 +1447,101 @@ tbody tr:hover {
     border-top: 1px solid rgba(148, 163, 184, 0.12);
   }
 
-  .movements-table .cell-notes-empty {
+  .movements-table-wrapper.view-cards .cell-notes-empty {
     display: none;
   }
 
-  .movements-table .cell-actions {
+  .movements-table-wrapper.view-cards .cell-actions {
     grid-area: actions;
     padding-top: 6px;
     border-top: 1px solid rgba(148, 163, 184, 0.12);
   }
 
-  .movements-table .cell-actions .row-actions {
+  .movements-table-wrapper.view-cards .cell-actions .row-actions {
     justify-content: stretch;
     gap: 8px;
   }
 
-  .movements-table .cell-actions .row-actions button {
+  .movements-table-wrapper.view-cards .cell-actions .row-actions button {
     flex: 1;
     padding: 8px 12px;
     font-size: 0.82rem;
+  }
+
+  /* —— Vista lista —— */
+  .movements-table-wrapper.view-list {
+    overflow: auto;
+    max-height: 65vh;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .movements-table-wrapper.view-list .movements-table {
+    display: table;
+    width: 100%;
+    min-width: 520px;
+    font-size: 0.76rem;
+  }
+
+  .movements-table-wrapper.view-list .movements-table thead {
+    display: table-header-group;
+  }
+
+  .movements-table-wrapper.view-list .movements-table tbody {
+    display: table-row-group;
+  }
+
+  .movements-table-wrapper.view-list .movements-table tbody tr.movement-row {
+    display: table-row;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .movements-table-wrapper.view-list .movements-table td {
+    display: table-cell;
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--border-accent);
+    vertical-align: middle;
+  }
+
+  .movements-table-wrapper.view-list .cell-concept {
+    font-weight: 500;
+    max-width: 140px;
+    word-break: break-word;
+  }
+
+  .movements-table-wrapper.view-list .cell-amount {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .movements-table-wrapper.view-list .cell-local:empty::before {
+    content: none;
+  }
+
+  .movements-table-wrapper.view-list .cell-id::before {
+    content: none;
+  }
+
+  .movements-table-wrapper.view-list .movements-table th:nth-child(1),
+  .movements-table-wrapper.view-list .movements-table td.cell-id,
+  .movements-table-wrapper.view-list .movements-table th:nth-child(7),
+  .movements-table-wrapper.view-list .movements-table td.cell-notes,
+  .movements-table-wrapper.view-list .movements-table th:nth-child(8),
+  .movements-table-wrapper.view-list .movements-table td.cell-creator {
+    display: none;
+  }
+
+  .movements-table-wrapper.view-list .cell-actions .row-actions {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .movements-table-wrapper.view-list .cell-actions .row-actions button {
+    padding: 3px 7px;
+    font-size: 0.68rem;
   }
 }
 
