@@ -159,16 +159,29 @@
             </div>
             <div class="field">
               <label for="local">Local</label>
-              <select id="local" name="local">
-                <option value="">Seleccione una opción...</option>
-              </select>
+              <input
+                id="local"
+                name="local"
+                type="text"
+                list="local-list"
+                placeholder="Escribe o elige un local..."
+                autocomplete="off"
+              />
+              <datalist id="local-list"></datalist>
             </div>
           </div>
           <div class="field">
             <label for="concept">Concepto</label>
-            <select id="concept" name="concept" required>
-              <option value="">Seleccione una opción...</option>
-            </select>
+            <input
+              id="concept"
+              name="concept"
+              type="text"
+              list="concept-list"
+              required
+              placeholder="Escribe o elige un concepto..."
+              autocomplete="off"
+            />
+            <datalist id="concept-list"></datalist>
           </div>
           <div class="field-inline">
             <div class="field">

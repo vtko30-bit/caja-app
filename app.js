@@ -317,7 +317,6 @@ function setOfflineBanner(offline) {
 }
 
 const CUADRADURA_DENOMS = [100, 500, 1000, 5000, 10000, 20000];
-const MOVEMENT_SELECT_EMPTY_LABEL = "Seleccione una opción...";
 
 function getCuadraturaMontoInputEl(d) {
   return document.getElementById(`cuad-monto-${d}`);
@@ -1118,38 +1117,37 @@ function setupCuadraturaListeners() {
   }
 }
 
-function populateMovementSelect(selectEl, movementField, selectedValue) {
-  if (!selectEl) return;
+function populateMovementDatalist(inputId, datalistId, movementField, selectedValue) {
+  const input = document.getElementById(inputId);
+  const datalist = document.getElementById(datalistId);
+  if (!datalist) return;
   const preserve = selectedValue !== undefined
     ? String(selectedValue ?? "").trim()
-    : String(selectEl.value ?? "").trim();
+    : String(input?.value ?? "").trim();
   const names = new Set(
     state.movements
       .map((m) => (m[movementField] || "").trim())
       .filter(Boolean)
   );
   if (preserve) names.add(preserve);
-  const sorted = [...names].sort((a, b) => a.localeCompare(b, "es"));
-  selectEl.innerHTML = "";
-  const emptyOpt = document.createElement("option");
-  emptyOpt.value = "";
-  emptyOpt.textContent = MOVEMENT_SELECT_EMPTY_LABEL;
-  selectEl.appendChild(emptyOpt);
+  const sorted = [...names].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+  datalist.innerHTML = "";
   sorted.forEach((nombre) => {
     const opt = document.createElement("option");
     opt.value = nombre;
-    opt.textContent = nombre;
-    selectEl.appendChild(opt);
+    datalist.appendChild(opt);
   });
-  selectEl.value = preserve && names.has(preserve) ? preserve : "";
+  if (input && selectedValue !== undefined) {
+    input.value = preserve;
+  }
 }
 
 function updateLocalDatalist(selectedValue) {
-  populateMovementSelect(document.getElementById("local"), "local", selectedValue);
+  populateMovementDatalist("local", "local-list", "local", selectedValue);
 }
 
 function updateConceptDatalist(selectedValue) {
-  populateMovementSelect(document.getElementById("concept"), "concept", selectedValue);
+  populateMovementDatalist("concept", "concept-list", "concept", selectedValue);
 }
 
 function applyFilters(movements) {
@@ -2178,7 +2176,14 @@ async function doGoogleLogin() {
   });
 
   if (error) {
-    setLoginError(error.message || "No se pudo iniciar sesión con Google.");
+    const msg = (error.message || "").toLowerCase();
+    if (msg.includes("not enabled") || msg.includes("unsupported provider")) {
+      setLoginError(
+        "Google no está activado en Supabase. Entra a Authentication → Providers → Google, actívalo y guarda el Client ID y Secret de Google Cloud."
+      );
+    } else {
+      setLoginError(error.message || "No se pudo iniciar sesión con Google.");
+    }
     if (btnGoogle) btnGoogle.disabled = false;
     if (googleLabel) googleLabel.textContent = "Continuar con Google";
   }

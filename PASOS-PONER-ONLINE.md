@@ -110,21 +110,31 @@ Para que aparezca el botón **Continuar con Google** en la pantalla de login:
 2. Menú **APIs y servicios** → **Credenciales** → **Crear credenciales** → **ID de cliente de OAuth**.
 3. Tipo de aplicación: **Aplicación web**.
 4. En **Orígenes autorizados de JavaScript** añade:
-   - La URL de tu app en Vercel (ej. `https://tu-caja-app.vercel.app`)
-   - `http://localhost:5500` (o el puerto que uses en local)
-5. En **URIs de redirección autorizados** añade la URL de callback de Supabase:
-   - `https://TU_PROYECTO.supabase.co/auth/v1/callback`
-   - (La encuentras en Supabase → **Authentication** → **Providers** → **Google**)
+   - `https://caja-app.vercel.app`
+   - `http://localhost:5500` (si pruebas en local)
+5. En **URIs de redirección autorizados** añade **exactamente** esta URL (callback de Supabase):
+   - `https://lpmpczarkjvnwjhwghqg.supabase.co/auth/v1/callback`
 6. Copia el **Client ID** y el **Client Secret**.
 
 ### 8.2 Supabase
 
-1. En Supabase → **Authentication** → **Providers** → **Google**.
-2. Activa el proveedor y pega el **Client ID** y **Client Secret** de Google.
-3. Guarda.
-4. En **Authentication** → **URL Configuration**:
-   - **Site URL:** URL de tu app en Vercel (ej. `https://tu-caja-app.vercel.app`)
-   - **Redirect URLs:** añade la misma URL de la app si no está.
+1. Abre tu proyecto en Supabase:  
+   **https://supabase.com/dashboard/project/lpmpczarkjvnwjhwghqg/auth/providers**
+2. Haz clic en **Google**.
+3. Activa el interruptor **Enable Sign in with Google**.
+4. Pega el **Client ID** y el **Client Secret** de Google Cloud (paso 8.1).
+5. Clic en **Save**.
+
+   La URL de callback que debes usar en Google Cloud es exactamente:  
+   `https://lpmpczarkjvnwjhwghqg.supabase.co/auth/v1/callback`
+
+6. En **Authentication** → **URL Configuration** (`/auth/url-configuration`):
+   - **Site URL:** `https://caja-app.vercel.app`
+   - **Redirect URLs:** añade `https://caja-app.vercel.app` (y `http://localhost:5500` si pruebas en local)
+
+### Error «Unsupported provider: provider is not enabled»
+
+Significa que el paso 8.2 **no está hecho** o no guardaste tras activar Google. Vuelve a Supabase → Providers → Google, confirma que el toggle está **ON** y que Client ID + Secret están completos → **Save**.
 
 ### 8.3 Desplegar
 
